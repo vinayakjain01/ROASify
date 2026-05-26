@@ -1,0 +1,153 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* ROASify Design System */
+:root {
+  /* Surface Colors */
+  --surface-page: #FAFAF8;
+  --surface-card: #FFFFFF;
+  --surface-sunken: #F2F0EA;
+  
+  /* Rail Colors */
+  --rail-bg: #17150F;
+  --rail-hover: #221F18;
+  
+  /* Text Colors */
+  --text-primary: #1A1814;
+  --text-secondary: #57544E;
+  --text-muted: #8B8780;
+  
+  /* Brand Colors */
+  --brand-primary: #4F46E5;
+  --brand-hover: #4338CA;
+  --brand-pressed: #3730A3;
+  --brand-subtle: #EEEDFB;
+  
+  /* Semantic Colors */
+  --success: #047857;
+  --warning: #B45309;
+  --danger: #B42318;
+  
+  /* Quadrant Colors */
+  --champions: #10B981;
+  --champions-bg: #E7F7F0;
+  --contenders: #3B82F6;
+  --contenders-bg: #EAF1FE;
+  --cruisers: #78716C;
+  --cruisers-bg: #F2F0EC;
+  --casualties: #EF4444;
+  --casualties-bg: #FDECEC;
+  
+  /* Border */
+  --border-default: #EEECE5;
+  --border-strong: #DEDBD2;
+  
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  
+  /* Shadcn defaults */
+  --background: #FAFAF8;
+  --foreground: #1A1814;
+  --card: #FFFFFF;
+  --card-foreground: #1A1814;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1814;
+  --primary: #4F46E5;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F2F0EA;
+  --secondary-foreground: #1A1814;
+  --muted: #F2F0EA;
+  --muted-foreground: #8B8780;
+  --accent: #EEEDFB;
+  --accent-foreground: #4F46E5;
+  --destructive: #B42318;
+  --destructive-foreground: #FFFFFF;
+  --border: #EEECE5;
+  --input: #EEECE5;
+  --ring: #4F46E5;
+  --radius: 0.625rem;
+  
+  /* Sidebar */
+  --sidebar: #17150F;
+  --sidebar-foreground: #FFFFFF;
+  --sidebar-primary: #4F46E5;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #221F18;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: #221F18;
+  --sidebar-ring: #4F46E5;
+}
+
+@theme inline {
+  --font-sans: 'General Sans', 'Geist', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Geist Mono', monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom utilities */
+.tabular-nums {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-sunken);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
