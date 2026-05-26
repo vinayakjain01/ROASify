@@ -3,10 +3,10 @@
 import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatRoi, getRoiColor } from '@/lib/format';
-import type { Product } from '@/lib/data';
+import type { ProductRow } from '@/lib/api';
 
 interface DataTableProps {
-  products: Product[];
+  products: ProductRow[];
   columns?: string[];
   maxHeight?: string;
   className?: string;
@@ -35,34 +35,82 @@ export function DataTable({
     discounted: 'Strategy'
   };
 
-  const formatCell = (product: Product, column: string): ReactNode => {
+  const formatCell = (product: ProductRow, column: string): ReactNode => {
+    const value = product[column as keyof ProductRow];
+
     switch (column) {
       case 'id':
-        return <span className="font-mono text-[13px] text-[#8B8780]">{product.id}</span>;
+        return (
+          <span className="font-mono text-[13px] text-[#8B8780]">
+            {String(value || '')}
+          </span>
+        );
+
       case 'title':
-        return <span className="font-medium">{product.title}</span>;
+        return (
+          <span className="font-medium">
+            {String(value || '')}
+          </span>
+        );
+
       case 'variant':
-        return product.variant;
+        return String(value || '');
+
       case 'metaSpend':
       case 'googleCost':
       case 'totalSpend':
-        return <span className="tabular-nums">{formatCurrency(product[column])}</span>;
       case 'revenue':
-        return <span className="tabular-nums">{formatCurrency(product.revenue)}</span>;
+        return (
+          <span className="tabular-nums">
+            {formatCurrency(Number(value || 0))}
+          </span>
+        );
+
       case 'roi':
-        return <span className={cn("tabular-nums font-medium", getRoiColor(product.roi))}>{formatRoi(product.roi)}</span>;
+        return (
+          <span
+            className={cn(
+              "tabular-nums font-medium",
+              getRoiColor(Number(value || 0))
+            )}
+          >
+            {formatRoi(Number(value || 0))}
+          </span>
+        );
+
       case 'itemsSold':
-        return <span className="tabular-nums">{product.itemsSold.toLocaleString('en-IN')}</span>;
+        return (
+          <span className="tabular-nums">
+            {Number(value || 0).toLocaleString('en-IN')}
+          </span>
+        );
+
       case 'ctr':
-        return <span className="tabular-nums">{product.ctr.toFixed(1)}%</span>;
+        return (
+          <span className="tabular-nums">
+            {Number(value || 0).toFixed(1)}%
+          </span>
+        );
+
       case 'cpm':
-        return <span className="tabular-nums">₹{product.cpm}</span>;
+        return (
+          <span className="tabular-nums">
+            ₹{Number(value || 0)}
+          </span>
+        );
+
       case 'category':
-        return product.category;
+        return String(value || '');
+
       case 'quadrant':
-        return <QuadrantTag quadrant={product.quadrant} />;
+        return (
+          <QuadrantTag
+            quadrant={String(value || 'cruisers')}
+          />
+        );
+
       case 'discounted':
-        return product.discounted ? (
+        return Boolean(value) ? (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#FEF3CD] text-[#B45309]">
             Discounted
           </span>
@@ -71,8 +119,9 @@ export function DataTable({
             Non-discount
           </span>
         );
+
       default:
-        return String(product[column as keyof Product] || '');
+        return String(value || '');
     }
   };
 
@@ -95,7 +144,7 @@ export function DataTable({
           <tbody className="divide-y divide-[#EEECE5]">
             {products.map((product) => (
               <tr 
-                key={product.id}
+                key={String(product.id || Math.random())}
                 className="hover:bg-[#F2F0EA] transition-colors duration-75"
               >
                 {columns.map((col) => (

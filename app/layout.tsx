@@ -2,20 +2,21 @@ import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
+import { AnalysisProvider } from '@/lib/analysis-context'
 
-const geist = Geist({ 
-  subsets: ["latin"],
+const geist = Geist({
+  subsets: ['latin'],
   variable: '--font-geist'
-});
+})
 
-const geistMono = Geist_Mono({ 
-  subsets: ["latin"],
+const geistMono = Geist_Mono({
+  subsets: ['latin'],
   variable: '--font-geist-mono'
-});
+})
 
 export const metadata: Metadata = {
   title: 'ROASify — Product ROAS Analytics for D2C Brands',
-  description: 'Analyze return on ad spend at the product level. Built for Indian D2C brands.',
+  description: 'Analyze return on ad spend at the product level',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -44,14 +45,21 @@ export const viewport: Viewport = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
   return (
     <html lang="en" className="bg-[#FAFAF8]">
-      <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
-        {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+      <body
+        className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}
+      >
+        <AnalysisProvider>
+          {children}
+        </AnalysisProvider>
+
+        {process.env.NODE_ENV === 'production' && (
+          <Analytics />
+        )}
       </body>
     </html>
   )

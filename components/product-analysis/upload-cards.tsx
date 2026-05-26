@@ -125,50 +125,63 @@ export function UploadCard({ source, state, onClear }: UploadCardProps) {
 }
 
 interface UploadGridProps {
-  state: 'empty' | 'uploaded' | 'error';
+  onMetaFile: (f: File) => void
+  onShopifyFile: (f: File) => void
+  onGoogleFile: (f: File | null) => void
 }
 
-export function UploadGrid({ state }: UploadGridProps) {
-  const sources: UploadSource[] = [
-    {
-      id: 'meta',
-      name: 'Meta Ads',
-      icon: null,
-      iconBg: 'bg-[#E7F0FF]',
-      required: true,
-      description: 'Campaign · Impressions · Clicks · Spend · CPM',
-      file: state === 'uploaded' ? { name: 'meta_ads_apr_may.csv', size: '142 KB', rows: 87 } : undefined,
-      error: state === 'error' ? 'Invalid column headers. Expected: Campaign, Impressions, Clicks, Spend, CPM' : undefined
-    },
-    {
-      id: 'shopify',
-      name: 'Shopify',
-      icon: null,
-      iconBg: 'bg-[#E7F7E7]',
-      required: true,
-      description: 'Order ID · Product · Quantity · Revenue · Discount',
-      file: state === 'uploaded' ? { name: 'shopify_orders_apr_may.csv', size: '186 KB', rows: 92 } : undefined
-    },
-    {
-      id: 'google',
-      name: 'Google Ads',
-      icon: null,
-      iconBg: 'bg-[#FEF3E7]',
-      required: false,
-      description: 'Campaign · Impressions · Clicks · Cost · Conversions',
-      file: state === 'uploaded' ? { name: 'google_ads_apr_may.csv', size: '98 KB', rows: 73 } : undefined
-    }
-  ];
+export function UploadGrid({
+  onMetaFile,
+  onShopifyFile,
+  onGoogleFile
+}: UploadGridProps) {
 
   return (
     <div className="grid grid-cols-3 gap-4">
-      {sources.map((source) => (
-        <UploadCard 
-          key={source.id} 
-          source={source} 
-          state={state}
+
+      {/* Meta Ads */}
+      <div className="bg-white rounded-[10px] border p-5">
+        <h3 className="font-medium mb-3">Meta Ads</h3>
+
+        <input
+          type="file"
+          accept=".csv,.xlsx"
+          onChange={(e) => {
+            if (e.target.files?.[0]) {
+              onMetaFile(e.target.files[0])
+            }
+          }}
         />
-      ))}
+      </div>
+
+      {/* Shopify */}
+      <div className="bg-white rounded-[10px] border p-5">
+        <h3 className="font-medium mb-3">Shopify</h3>
+
+        <input
+          type="file"
+          accept=".csv,.xlsx"
+          onChange={(e) => {
+            if (e.target.files?.[0]) {
+              onShopifyFile(e.target.files[0])
+            }
+          }}
+        />
+      </div>
+
+      {/* Google */}
+      <div className="bg-white rounded-[10px] border p-5">
+        <h3 className="font-medium mb-3">Google Ads</h3>
+
+        <input
+          type="file"
+          accept=".csv,.xlsx"
+          onChange={(e) => {
+            onGoogleFile(e.target.files?.[0] || null)
+          }}
+        />
+      </div>
+
     </div>
-  );
+  )
 }
