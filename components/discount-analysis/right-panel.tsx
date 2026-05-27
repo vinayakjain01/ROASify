@@ -1,7 +1,7 @@
 'use client';
 
 import { discountedStats, nonDiscountedStats, runMetadata } from '@/lib/data';
-import { formatRoi } from '@/lib/format';
+import { formatRoi } from '@/lib/formatters';
 import { PanelSection } from '@/components/layout/right-panel';
 
 export function DiscountPanel() {

@@ -1,7 +1,7 @@
 'use client';
 
 import { topPerformers } from '@/lib/data';
-import { formatCurrency, formatRoi } from '@/lib/format';
+import { formatCurrency, formatRoi } from '@/lib/formatters';
 
 export function TopPerformers() {
   const narratives = [

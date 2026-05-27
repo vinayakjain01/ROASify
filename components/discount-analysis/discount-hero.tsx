@@ -3,7 +3,7 @@
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { discountedStats, nonDiscountedStats } from '@/lib/data';
-import { formatCurrency, formatRoi } from '@/lib/format';
+import { formatCurrency, formatRoi } from '@/lib/formatters';
 
 export function DiscountHero() {
   const roiAdvantage = nonDiscountedStats.roi / discountedStats.roi;

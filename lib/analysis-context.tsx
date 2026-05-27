@@ -1,10 +1,10 @@
 'use client';
 import { createContext, useContext, useState } from 'react';
-import { AnalyseResponse } from './api';
+import type { AnalyseResponse } from './api';
 
 const AnalysisCtx = createContext<{
   result: AnalyseResponse | null;
-  setResult: (r: AnalyseResponse) => void;
+  setResult:(r:AnalyseResponse|null)=>void;
 }>({ result: null, setResult: () => {} });
 
 export function AnalysisProvider({ children }: { children: React.ReactNode }) {

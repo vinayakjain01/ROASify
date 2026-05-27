@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ChevronDown, Star, Diamond, Circle, Triangle, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getQuadrantData, type Quadrant, type Product } from '@/lib/data';
-import { formatCurrency, formatRoi, getQuadrantColor, getRoiColor } from '@/lib/format';
+import { formatCurrency, formatRoi, getQuadrantColor, getRoiColor } from '@/lib/formatters';
 import { DataTable } from '@/components/ui/data-table';
 
 interface QuadrantCardProps {

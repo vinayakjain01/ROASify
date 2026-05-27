@@ -2,7 +2,7 @@
 
 import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { formatCurrency, formatRoi, getRoiColor } from '@/lib/format';
+import { inr, roi, roiColor } from '@/lib/formatters'
 import type { ProductRow } from '@/lib/api';
 
 interface DataTableProps {
@@ -62,7 +62,7 @@ export function DataTable({
       case 'revenue':
         return (
           <span className="tabular-nums">
-            {formatCurrency(Number(value || 0))}
+            {inr(Number(value || 0))}
           </span>
         );
 
@@ -71,10 +71,10 @@ export function DataTable({
           <span
             className={cn(
               "tabular-nums font-medium",
-              getRoiColor(Number(value || 0))
+              roiColor(Number(value || 0))
             )}
           >
-            {formatRoi(Number(value || 0))}
+            {roi(Number(value || 0))}
           </span>
         );
 

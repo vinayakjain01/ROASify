@@ -3,7 +3,7 @@
 import { ArrowRight, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getQuadrantData, topPerformers } from '@/lib/data';
-import { formatCurrency, formatRoi } from '@/lib/format';
+import { formatCurrency, formatRoi } from '@/lib/formatters';
 
 export function ChampionsHero() {
   const championsData = getQuadrantData('champions');

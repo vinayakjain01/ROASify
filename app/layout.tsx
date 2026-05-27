@@ -1,66 +1,29 @@
-import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
-import './globals.css'
-import { AnalysisProvider } from '@/lib/analysis-context'
-
-const geist = Geist({
-  subsets: ['latin'],
-  variable: '--font-geist'
-})
-
-const geistMono = Geist_Mono({
-  subsets: ['latin'],
-  variable: '--font-geist-mono'
-})
+import type { Metadata } from "next";
+import "./globals.css";
+import { AppProvider } from "@/lib/context";
 
 export const metadata: Metadata = {
-  title: 'ROASify — Product ROAS Analytics for D2C Brands',
-  description: 'Analyze return on ad spend at the product level',
-  generator: 'v0.app',
-  icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
-  },
-}
+  title: "ROASify — Product-level ROAS",
+  description: "Product Performance Marketing Analytics for Indian D2C brands",
+};
 
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  themeColor: '#4F46E5',
-}
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="bg-[#FAFAF8]">
-      <body
-        className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}
-      >
-        <AnalysisProvider>
-          {children}
-        </AnalysisProvider>
-
-        {process.env.NODE_ENV === 'production' && (
-          <Analytics />
-        )}
+    <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://api.fontshare.com" />
+        <link
+          href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap"
+          rel="stylesheet"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body>
+        <AppProvider>{children}</AppProvider>
       </body>
     </html>
-  )
+  );
 }

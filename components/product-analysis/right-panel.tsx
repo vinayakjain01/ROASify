@@ -1,7 +1,7 @@
 'use client';
 
 import { runMetadata, totalProducts, totalMetaSpend, totalGoogleCost, totalSpend, totalRevenue, overallRoi } from '@/lib/data';
-import { formatCurrency, formatRoi } from '@/lib/format';
+import { formatCurrency, formatRoi } from '@/lib/formatters';
 import { PanelSection, PanelRow, SourceItem } from '@/components/layout/right-panel';
 
 export function ProductAnalysisPanel() {

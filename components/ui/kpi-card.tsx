@@ -1,6 +1,6 @@
 'use client';
 
-import { formatCurrency, formatRoi, formatPercentage } from '@/lib/format';
+import { formatCurrency, formatRoi, formatPercentage } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 
 interface KpiCardProps {

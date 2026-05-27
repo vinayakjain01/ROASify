@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { products } from '@/lib/data';
-import { formatCurrency, formatRoi, getRoiColor } from '@/lib/format';
+import { formatCurrency, formatRoi, getRoiColor } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 
 type StrategyFilter = 'all' | 'discounted' | 'non-discounted';

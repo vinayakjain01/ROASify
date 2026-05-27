@@ -1,7 +1,7 @@
 'use client';
 
 import { discountedStats, nonDiscountedStats } from '@/lib/data';
-import { formatCurrency, formatRoi } from '@/lib/format';
+import { formatCurrency, formatRoi } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 
 interface MetricRowProps {

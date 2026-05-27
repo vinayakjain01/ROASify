@@ -1,7 +1,7 @@
 'use client';
 
 import { getQuadrantData, runMetadata } from '@/lib/data';
-import { formatCurrency, formatRoi, getQuadrantColor } from '@/lib/format';
+import { formatCurrency, formatRoi, getQuadrantColor } from '@/lib/formatters';
 import { PanelSection, PanelRow } from '@/components/layout/right-panel';
 import { Slider } from '@/components/ui/slider';
 

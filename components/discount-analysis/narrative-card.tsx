@@ -1,7 +1,7 @@
 'use client';
 
 import { discountedStats, nonDiscountedStats } from '@/lib/data';
-import { formatCurrency, formatRoi } from '@/lib/format';
+import { formatCurrency, formatRoi } from '@/lib/formatters';
 
 export function NarrativeCard() {
   const roiDiff = nonDiscountedStats.roi - discountedStats.roi;

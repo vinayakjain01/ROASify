@@ -1,89 +1,86 @@
-// lib/api.ts
-export interface AnalyseResponse {
-  ok:           boolean;
-  hasMonth:     boolean;
-  hasGoogle:    boolean;
-  products:     ProductRow[];
-  kpis:         Kpis;
-  quadrants:    Quadrants;
-  discountData: DiscountData | null;
-  warnings:     string[];
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+export interface ProductRow{
+   [key:string]:string|number|boolean
 }
 
-export interface ProductRow {
-  "Product ID":       string;
-  "Product Title"?:   string;
-  "Variant Title"?:   string;
-  "Meta Spend"?:      number;
-  "Google Cost"?:     number;
-  "Total Spend"?:     number;
-  "Shopify Revenue"?: number;
-  "ROI"?:             number;
-  "Net Items Sold"?:  number;
-  "Landing Page Views"?: number;
-  "CTR"?:             number;
-  "CPM"?:             number;
-  "Month"?:           string;
-  [key: string]:      unknown;
+export interface AnalyseResponse{
+   products:ProductRow[]
+   summary:any
 }
 
-export interface Kpis {
-  totalProducts:   number;
-  totalMetaSpend:  number;
-  totalGoogleCost: number;
-  totalSpend:      number;
-  totalRevenue:    number;
-  overallRoi:      number;
-}
-
-export interface Quadrants {
-  q1:    ProductRow[];   // Champions  (low spend, high revenue)
-  q2:    ProductRow[];   // Contenders (high spend, high revenue)
-  q3:    ProductRow[];   // Casualties (high spend, low revenue)
-  q4:    ProductRow[];   // Cruisers   (low spend, low revenue)
-  spCut: number;
-  rvCut: number;
-}
-
-export interface DiscountData {
-  summary:       DiscountSummaryRow[];
-  monthsOrdered: string[];
-}
-
-export interface DiscountSummaryRow {
-  Month:        string;
-  Category:     string;
-  Spend:        number;
-  Revenue:      number;
-  Spend_Pct:    number;
-  Revenue_Pct:  number;
-  ROI:          number;
-}
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
-export async function analyseFiles(
-  metaFile: File,
-  shopifyFile: File,
-  googleFile: File | null,
-  spendThresh = 100,
-  revThresh   = 100,
-): Promise<AnalyseResponse> {
-  const form = new FormData();
-  form.append("meta_file",    metaFile);
-  form.append("shopify_file", shopifyFile);
-  if (googleFile) form.append("google_file", googleFile);
-  form.append("spend_pct_thresh", String(spendThresh));
-  form.append("rev_pct_thresh",   String(revThresh));
-
-  const res = await fetch(`${API_BASE}/api/analyse`, {
+async function post(path: string, body: FormData | object) {
+  const isForm = body instanceof FormData;
+  const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    body:   form,
+    headers: isForm ? undefined : { "Content-Type": "application/json" },
+    body: isForm ? body : JSON.stringify(body),
   });
-
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail ?? "API error");
+    const text = await res.text();
+    throw new Error(text || `HTTP ${res.status}`);
   }
   return res.json();
+}
+
+// ── Product Analysis ──────────────────────────────────────────────────
+export async function mergeFiles(
+  meta: File,
+  shopify: File,
+  google?: File | null
+) {
+  const fd = new FormData();
+
+  fd.append("meta_file", meta);
+  fd.append("shopify_file", shopify);
+
+  if (google) {
+    fd.append("google_file", google);
+  }
+
+  return post("/api/analyse", fd);
+}
+
+// ── Quadrant View ─────────────────────────────────────────────────────
+export async function runQuadrant(
+  meta: File,
+  shopify: File,
+  spendPct = 100,
+  revPct   = 100
+) {
+  const fd = new FormData();
+  fd.append("meta", meta);
+  fd.append("shopify", shopify);
+  fd.append("spend_pct", String(spendPct));
+  fd.append("rev_pct",   String(revPct));
+  return post("/api/quadrant", fd);
+}
+
+export async function recalcQuadrant(
+  products: unknown[],
+  spCut: number,
+  rvCut: number
+) {
+  return post("/api/quadrant/recalc", { products, sp_cut: spCut, rv_cut: rvCut });
+}
+
+export async function getAiInsights(payload: object) {
+  return post("/api/ai-insights", payload);
+}
+
+// ── Discount Analysis ─────────────────────────────────────────────────
+export async function runDiscount(
+  meta:      File,
+  shopify:   File,
+  discount:  File,
+  spendPct = 100,
+  revPct   = 100
+) {
+  const fd = new FormData();
+  fd.append("meta",      meta);
+  fd.append("shopify",   shopify);
+  fd.append("discount",  discount);
+  fd.append("spend_pct", String(spendPct));
+  fd.append("rev_pct",   String(revPct));
+  return post("/api/discount", fd);
 }
