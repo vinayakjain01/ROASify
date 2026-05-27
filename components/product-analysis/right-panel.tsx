@@ -1,57 +1,83 @@
 'use client';
 
-import { runMetadata, totalProducts, totalMetaSpend, totalGoogleCost, totalSpend, totalRevenue, overallRoi, products } from '@/lib/data';
+import { useApp } from '@/lib/context';
+import type { Product } from '@/lib/context';
 import { inr, roiColor } from '@/lib/formatters';
 import { PanelSection, PanelRow, SourceItem } from '@/components/layout/right-panel';
-import { getStore } from '@/lib/store';
+
+function getSpend(p: Product): number   { return p['Total Spend']    ?? (p as any).totalSpend ?? 0; }
+function getRevenue(p: Product): number { return p['Shopify Revenue'] ?? (p as any).revenue    ?? 0; }
+function getItemsSold(p: Product): number { return p['Net Items Sold'] ?? (p as any).itemsSold ?? 0; }
+
+function fmt(n: number | undefined, fallback = '—'): string {
+  return n !== undefined && !isNaN(n) ? inr(n) : fallback;
+}
 
 export function ProductAnalysisPanel() {
-  const store = getStore();
-  const avgSpend   = totalSpend   / totalProducts;
-  const avgRevenue = totalRevenue / totalProducts;
-  const avgRoi     = overallRoi;
-  const avgLpv     = Math.round(products.reduce((s, p) => s + p.itemsSold, 0) / totalProducts);
+  const { metaFile, shopifyFile, googleFile, mergedData, mergedSummary } = useApp();
+
+  const products = mergedData ?? [];
+  const count = products.length;
+
+  const totalSpend   = mergedSummary?.total_spend ?? products.reduce((s, p) => s + getSpend(p), 0);
+  const totalRevenue = mergedSummary?.total_rev   ?? products.reduce((s, p) => s + getRevenue(p), 0);
+  const metaSpend    = mergedSummary?.meta_spend  ?? 0;
+  const googleCost   = mergedSummary?.google_cost ?? 0;
+  const overallRoi   = mergedSummary?.roi         ?? (totalSpend > 0 ? totalRevenue / totalSpend : 0);
+
+  const avgSpend   = count > 0 ? totalSpend   / count : 0;
+  const avgRevenue = count > 0 ? totalRevenue / count : 0;
+  const avgMetaSpend   = count > 0 && metaSpend   > 0 ? metaSpend   / count : avgSpend * 0.77;
+  const avgGoogleCost  = count > 0 && googleCost  > 0 ? googleCost  / count : avgSpend * 0.23;
+  const avgLpv = count > 0
+    ? Math.round(products.reduce((s, p) => s + getItemsSold(p), 0) / count)
+    : 0;
+
+  const runId = mergedData
+    ? (() => { const n = new Date(); return `pa_${n.getFullYear()}_${String(n.getMonth()+1).padStart(2,'0')}_${String(n.getDate()).padStart(2,'0')}`; })()
+    : '—';
 
   const files = [
-    { key: 'meta',    label: 'Meta Ads',   file: store.metaFile   },
-    { key: 'shopify', label: 'Shopify',    file: store.shopifyFile },
-    { key: 'google',  label: 'Google Ads', file: store.googleFile  },
+    { key: 'meta',    label: 'Meta Ads',   stored: metaFile   },
+    { key: 'shopify', label: 'Shopify',    stored: shopifyFile },
+    { key: 'google',  label: 'Google Ads', stored: googleFile  },
   ];
 
   return (
     <div className="p-5 space-y-5">
       <PanelSection title="Run details">
         <div className="space-y-1">
-          <PanelRow label="Run ID"  value={runMetadata.runId}  mono />
-          <PanelRow label="Period"  value={runMetadata.period} />
+          <PanelRow label="Run ID"    value={runId} mono />
+          <PanelRow label="Products"  value={String(count)} />
+          <PanelRow label="Sources"   value={files.filter(f => f.stored).length + ' files'} />
         </div>
         <div className="mt-4">
           <div className="text-[10px] font-semibold text-[#8B8780] uppercase tracking-widest mb-2">
             Sources merged
           </div>
-          {files.map(({ key, label, file }) => (
+          {files.map(({ key, label, stored }) => (
             <SourceItem
               key={key}
               name={label}
-              rows={file
-                ? Math.round(file.size / 40)   // rough estimate until real API
-                : runMetadata.sources.find(s => s.name.toLowerCase().startsWith(key))?.rows ?? 0}
-              connected={!!file || true}
+              rows={stored ? Math.round(stored.size / 40) : 0}
+              connected={!!stored}
             />
           ))}
         </div>
       </PanelSection>
 
-      <PanelSection title="Averages per product">
-        <div className="space-y-1">
-          <PanelRow label="Avg Meta Spend"   value={inr(avgSpend * 0.77)} />
-          <PanelRow label="Avg Google Spend" value={inr(avgSpend * 0.23)} />
-          <PanelRow label="Avg Total Spend"  value={inr(avgSpend)} />
-          <PanelRow label="Avg Revenue"      value={inr(avgRevenue)} />
-          <PanelRow label="Avg ROI"          value={roiColor(avgRoi)} />
-          <PanelRow label="Avg LPV"          value={avgLpv.toLocaleString('en-IN')} />
-        </div>
-      </PanelSection>
+      {count > 0 && (
+        <PanelSection title="Averages per product">
+          <div className="space-y-1">
+            <PanelRow label="Avg Meta Spend"   value={fmt(avgMetaSpend)} />
+            <PanelRow label="Avg Google Spend" value={fmt(avgGoogleCost)} />
+            <PanelRow label="Avg Total Spend"  value={fmt(avgSpend)} />
+            <PanelRow label="Avg Revenue"      value={fmt(avgRevenue)} />
+            <PanelRow label="Avg ROI"          value={roiColor(overallRoi)} />
+            <PanelRow label="Avg Units/Product" value={avgLpv.toLocaleString('en-IN')} />
+          </div>
+        </PanelSection>
+      )}
 
       <PanelSection title="Methodology">
         <p className="text-sm text-[#57544E] leading-relaxed">

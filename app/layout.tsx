@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
+import { AppProvider } from '@/lib/context'
 
 export const metadata: Metadata = {
   title: 'ROASify — Product ROAS Analytics for D2C Brands',
@@ -25,14 +26,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="bg-[#FAFAF8]">
       <head>
-        {/* Geist served locally via npm package – no external fetch needed */}
         <style>{`
           :root { --font-geist: ui-sans-serif, system-ui, -apple-system, sans-serif; }
           body { font-family: var(--font-geist); }
         `}</style>
       </head>
       <body className="font-sans antialiased">
-        {children}
+        <AppProvider>
+          {children}
+        </AppProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

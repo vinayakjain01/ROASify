@@ -9,29 +9,42 @@ import { QuadrantGrid } from '@/components/quadrant-view/quadrant-cards';
 import { AIAnalysis } from '@/components/quadrant-view/ai-analysis';
 import { FourCsSlideover } from '@/components/quadrant-view/four-cs-slideover';
 import { QuadrantPanel } from '@/components/quadrant-view/right-panel';
-import { 
-  totalProducts, 
-  totalSpend, 
-  totalRevenue, 
-  overallRoi,
-  runMetadata
-} from '@/lib/data';
+import { useApp } from '@/lib/context';
+import type { Product } from '@/lib/context';
+
+function getRoi(p: Product): number {
+  return p.ROI ?? (p['Shopify Revenue'] && p['Total Spend'] ? p['Shopify Revenue'] / p['Total Spend'] : 0);
+}
+function getSpend(p: Product): number { return p['Total Spend'] ?? (p as any).totalSpend ?? 0; }
+function getRevenue(p: Product): number { return p['Shopify Revenue'] ?? (p as any).revenue ?? 0; }
 
 export default function QuadrantViewPage() {
+  const { mergedData, mergedSummary } = useApp();
   const [slideoverOpen, setSlideoverOpen] = useState(false);
-  const [spendThreshold, setSpendThreshold] = useState(61000);
-  const [revenueThreshold, setRevenueThreshold] = useState(330000);
+  const [spendPct, setSpendPct] = useState(50);
+  const [revPct, setRevPct] = useState(50);
 
-  const resetThresholds = () => {
-    setSpendThreshold(61000);
-    setRevenueThreshold(330000);
-  };
+  const products = mergedData ?? [];
+
+  // Compute thresholds as percentiles of actual data
+  const spends   = products.map(getSpend).sort((a, b) => a - b);
+  const revenues = products.map(getRevenue).sort((a, b) => a - b);
+
+  const pctIndex = (arr: number[], pct: number) =>
+    arr[Math.max(0, Math.floor((pct / 100) * arr.length) - 1)] ?? 0;
+
+  const spendThreshold   = spends.length   > 0 ? pctIndex(spends,   spendPct)   : 61000;
+  const revenueThreshold = revenues.length > 0 ? pctIndex(revenues, revPct)     : 330000;
+
+  const totalSpend   = products.reduce((s, p) => s + getSpend(p), 0);
+  const totalRevenue = products.reduce((s, p) => s + getRevenue(p), 0);
+  const overallRoi   = totalSpend > 0 ? totalRevenue / totalSpend : 0;
 
   const kpiCards = [
-    { label: 'TOTAL PRODUCTS', value: totalProducts, format: 'number'   as const, showSparkline: false },
-    { label: 'TOTAL SPEND',    value: totalSpend,    format: 'currency' as const, showSparkline: false },
-    { label: 'TOTAL REVENUE',  value: totalRevenue,  format: 'currency' as const, showSparkline: false },
-    { label: 'OVERALL ROI',    value: overallRoi,    format: 'roi'      as const, showSparkline: false },
+    { label: 'TOTAL PRODUCTS', value: products.length || (mergedSummary?.products ?? 0), format: 'number'   as const, showSparkline: false },
+    { label: 'TOTAL SPEND',    value: mergedSummary?.total_spend ?? totalSpend,           format: 'currency' as const, showSparkline: false },
+    { label: 'TOTAL REVENUE',  value: mergedSummary?.total_rev   ?? totalRevenue,         format: 'currency' as const, showSparkline: false },
+    { label: 'OVERALL ROI',    value: mergedSummary?.roi         ?? overallRoi,           format: 'roi'      as const, showSparkline: false },
   ];
 
   const breadcrumbs = [
@@ -44,9 +57,9 @@ export default function QuadrantViewPage() {
     <QuadrantPanel
       spendThreshold={spendThreshold}
       revenueThreshold={revenueThreshold}
-      onSpendChange={setSpendThreshold}
-      onRevenueChange={setRevenueThreshold}
-      onReset={resetThresholds}
+      onSpendChange={setSpendPct}
+      onRevenueChange={setRevPct}
+      onReset={() => { setSpendPct(50); setRevPct(50); }}
     />
   );
 
@@ -56,7 +69,6 @@ export default function QuadrantViewPage() {
       rightPanel={panel}
       rightPanelTitle="Thresholds & Stats"
     >
-      {/* Page Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-[#1A1814] mb-1">
@@ -77,36 +89,41 @@ export default function QuadrantViewPage() {
       {/* Source Banner */}
       <div className="mb-5 bg-[#F2F0EA] rounded-xl px-5 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-[#10B981] rounded-full" />
+          <div className={`w-2 h-2 rounded-full ${mergedData ? 'bg-[#10B981]' : 'bg-[#F59E0B]'}`} />
           <span className="text-sm text-[#1A1814]">
-            Using data from Product Analysis · <span className="font-mono text-xs">{runMetadata.runId}</span>
+            {mergedData
+              ? <>Using live merged data · <span className="font-semibold">{products.length} products</span></>
+              : 'No merged data yet — run Product Analysis first'}
           </span>
         </div>
-        <Link
-          href="/product-analysis"
-          className="text-sm text-[#4F46E5] hover:text-[#4338CA]"
-        >
-          View source dataset →
+        <Link href="/product-analysis" className="text-sm text-[#4F46E5] hover:text-[#4338CA]">
+          {mergedData ? 'View source dataset →' : 'Go to Product Analysis →'}
         </Link>
       </div>
 
-      {/* KPI Strip */}
-      <KpiStrip cards={kpiCards} className="mb-6" />
+      {!mergedData && (
+        <div className="py-20 text-center text-[#8B8780]">
+          <p className="text-lg font-medium mb-2">No data loaded</p>
+          <p className="text-sm">Upload your files and run Product Analysis to see the quadrant view.</p>
+        </div>
+      )}
 
-      {/* Champions Hero */}
-      <div className="mb-5">
-        <ChampionsHero />
-      </div>
+      {mergedData && (
+        <>
+          <KpiStrip cards={kpiCards} className="mb-6" />
 
-      {/* Quadrant Grid */}
-      <div className="mb-5">
-        <QuadrantGrid spendThreshold={spendThreshold} revenueThreshold={revenueThreshold} />
-      </div>
+          <div className="mb-5">
+            <ChampionsHero spendThreshold={spendThreshold} revenueThreshold={revenueThreshold} />
+          </div>
 
-      {/* AI Analysis */}
-      <AIAnalysis />
+          <div className="mb-5">
+            <QuadrantGrid spendThreshold={spendThreshold} revenueThreshold={revenueThreshold} />
+          </div>
 
-      {/* Slideover */}
+          <AIAnalysis />
+        </>
+      )}
+
       <FourCsSlideover isOpen={slideoverOpen} onClose={() => setSlideoverOpen(false)} />
     </DashboardLayout>
   );

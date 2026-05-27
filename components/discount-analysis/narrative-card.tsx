@@ -1,11 +1,13 @@
 'use client';
 
-import { discountedStats, nonDiscountedStats } from '@/lib/data';
 import { inr, roi } from '@/lib/formatters';
 
-export function NarrativeCard() {
-  const roiDiff = nonDiscountedStats.roi - discountedStats.roi;
-  
+interface Stats { count: number; spend: number; revenue: number; roi: number; }
+interface Props { discountedStats: Stats; nonDiscountedStats: Stats; }
+
+export function NarrativeCard({ discountedStats: d, nonDiscountedStats: nd }: Props) {
+  const roiDiff = nd.roi - d.roi;
+
   return (
     <div className="bg-white rounded-[10px] border border-[#EEECE5] border-l-[3px] border-l-[#4F46E5] overflow-hidden">
       <div className="p-6">
@@ -13,42 +15,23 @@ export function NarrativeCard() {
           <span className="text-[#4F46E5]">↗</span>
           What this means for next month
         </h3>
-
         <div className="space-y-6">
-          {/* What Changed */}
           <div>
-            <div className="text-xs font-medium text-[#8B8780] uppercase tracking-wider mb-2">
-              What changed
-            </div>
+            <div className="text-xs font-medium text-[#8B8780] uppercase tracking-wider mb-2">What changed</div>
             <p className="text-sm text-[#57544E] leading-relaxed">
-              Non-discounted products achieved {roi(nonDiscountedStats.roi)} ROI compared to 
-              discounted products at {roi(discountedStats.roi)} — a difference of {roi(roiDiff)} per 
-              rupee spent. This gap has widened by 0.4x compared to last period.
+              Non-discounted products achieved {roi(nd.roi)} ROI compared to discounted products at {roi(d.roi)} — a difference of {roi(roiDiff)} per rupee spent.
             </p>
           </div>
-
-          {/* Why It Matters */}
           <div>
-            <div className="text-xs font-medium text-[#8B8780] uppercase tracking-wider mb-2">
-              Why it matters
-            </div>
+            <div className="text-xs font-medium text-[#8B8780] uppercase tracking-wider mb-2">Why it matters</div>
             <p className="text-sm text-[#57544E] leading-relaxed">
-              Discounts are eroding margin faster than they are driving volume. The {discountedStats.count} discounted 
-              products consumed {inr(discountedStats.spend)} in ad spend but generated only{' '}
-              {inr(discountedStats.revenue)} in revenue. Meanwhile, {nonDiscountedStats.count} non-discounted 
-              products generated {inr(nonDiscountedStats.revenue)} on {inr(nonDiscountedStats.spend)} spend.
+              Discounts are eroding margin faster than they are driving volume. The {d.count} discounted products consumed {inr(d.spend)} in ad spend but generated only {inr(d.revenue)} in revenue. Meanwhile, {nd.count} non-discounted products generated {inr(nd.revenue)} on {inr(nd.spend)} spend.
             </p>
           </div>
-
-          {/* What To Do Next */}
           <div>
-            <div className="text-xs font-medium text-[#8B8780] uppercase tracking-wider mb-2">
-              What to do next
-            </div>
+            <div className="text-xs font-medium text-[#8B8780] uppercase tracking-wider mb-2">What to do next</div>
             <p className="text-sm text-[#57544E] leading-relaxed">
-              Pause ad spend on Casualties-quadrant discounted products (TKR-998, AYU-302, ACC-411, HMS-505). 
-              Reallocate budget to Champions like TKR-441 and AYU-007 which maintain strong ROI without discounting. 
-              For Contenders with active discounts, test reducing discount depth by 10% while monitoring conversion rates.
+              Reallocate budget from low-ROI discounted products to top non-discounted performers. For contenders with active discounts, test reducing discount depth by 10% while monitoring conversion rates.
             </p>
           </div>
         </div>

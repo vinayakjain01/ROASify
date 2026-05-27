@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { Upload, Check, X, AlertCircle, RefreshCw } from 'lucide-react';
+import { useRef, useState, useCallback } from 'react';
+import { Upload, Check, X, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getStore, setFile } from '@/lib/store';
+import { useApp } from '@/lib/context';
 
 interface SourceConfig {
   id: 'meta' | 'shopify' | 'google';
@@ -11,7 +11,6 @@ interface SourceConfig {
   required: boolean;
   description: string;
   iconBg: string;
-  accentColor: string;
 }
 
 const sources: SourceConfig[] = [
@@ -21,7 +20,6 @@ const sources: SourceConfig[] = [
     required: true,
     description: 'Product ID · Month · Amount Spent · Landing Page Views · CTR · CPM',
     iconBg: 'bg-[#E7F0FF]',
-    accentColor: '#1877F2',
   },
   {
     id: 'shopify',
@@ -29,7 +27,6 @@ const sources: SourceConfig[] = [
     required: true,
     description: 'Product Variant ID · Product Title · Month · Net Sales · Net Items Sold',
     iconBg: 'bg-[#E7F7E7]',
-    accentColor: '#96BF48',
   },
   {
     id: 'google',
@@ -37,7 +34,6 @@ const sources: SourceConfig[] = [
     required: false,
     description: 'Item ID · Product Title · Month · Cost · Conversions',
     iconBg: 'bg-[#FEF3E7]',
-    accentColor: '#FBBC04',
   },
 ];
 
@@ -92,7 +88,6 @@ function UploadCard({ source, file, onFile }: UploadCardProps) {
       file ? 'border-[#10B981] shadow-sm' : 'border-[#EEECE5]',
       dragging && 'border-[#4F46E5] bg-[#FAFAFF]'
     )}>
-      {/* Header */}
       <div className="flex items-start justify-between p-4 pb-3">
         <div className="flex items-center gap-3">
           <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0', source.iconBg)}>
@@ -121,7 +116,6 @@ function UploadCard({ source, file, onFile }: UploadCardProps) {
         )}
       </div>
 
-      {/* Drop zone or file info */}
       <div className="px-4 pb-4">
         {file ? (
           <div className="flex items-center gap-3 px-3 py-2.5 bg-[#E7F7F0] rounded-lg">
@@ -173,45 +167,26 @@ function UploadCard({ source, file, onFile }: UploadCardProps) {
   );
 }
 
-interface UploadGridProps {
-  onFilesChange?: (meta: File | null, shopify: File | null, google: File | null) => void;
-}
-
-export function UploadGrid({ onFilesChange }: UploadGridProps) {
-  // Bootstrap from persistent store
-  const store = getStore();
-  const [metaFile, setMetaFileLocal] = useState<File | null>(store.metaFile);
-  const [shopifyFile, setShopifyFileLocal] = useState<File | null>(store.shopifyFile);
-  const [googleFile, setGoogleFileLocal] = useState<File | null>(store.googleFile);
+export function UploadGrid() {
+  const { metaFile, shopifyFile, googleFile, setMetaFile, setShopifyFile, setGoogleFile, clearMergedData } = useApp();
 
   const handleFile = (key: 'meta' | 'shopify' | 'google', file: File | null) => {
-    setFile(key, file);
-    if (key === 'meta') setMetaFileLocal(file);
-    else if (key === 'shopify') setShopifyFileLocal(file);
-    else setGoogleFileLocal(file);
+    if (key === 'meta') setMetaFile(file);
+    else if (key === 'shopify') setShopifyFile(file);
+    else setGoogleFile(file);
+    // If a required file is removed, clear merged results
+    if (!file && (key === 'meta' || key === 'shopify')) clearMergedData();
   };
 
-  useEffect(() => {
-    onFilesChange?.(metaFile, shopifyFile, googleFile);
-  }, [metaFile, shopifyFile, googleFile]);
+  const metaF  = metaFile?.file    ?? null;
+  const shopF  = shopifyFile?.file  ?? null;
+  const gooF   = googleFile?.file   ?? null;
 
   return (
     <div className="grid grid-cols-3 gap-4">
-      <UploadCard
-        source={sources[0]}
-        file={metaFile}
-        onFile={(f) => handleFile('meta', f)}
-      />
-      <UploadCard
-        source={sources[1]}
-        file={shopifyFile}
-        onFile={(f) => handleFile('shopify', f)}
-      />
-      <UploadCard
-        source={sources[2]}
-        file={googleFile}
-        onFile={(f) => handleFile('google', f)}
-      />
+      <UploadCard source={sources[0]} file={metaF}  onFile={(f) => handleFile('meta', f)} />
+      <UploadCard source={sources[1]} file={shopF}  onFile={(f) => handleFile('shopify', f)} />
+      <UploadCard source={sources[2]} file={gooF}   onFile={(f) => handleFile('google', f)} />
     </div>
   );
 }
