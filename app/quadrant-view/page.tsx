@@ -315,7 +315,7 @@ export default function QuadrantViewPage() {
             </div>
             <div>
               <div className="text-white font-semibold text-sm">ROAS<span className="text-indigo-400">ify</span></div>
-              <div className="text-slate-500 text-xs">PPM Analytics</div>
+              {/* <div className="text-slate-500 text-xs">PPM Analytics</div> */}
             </div>
           </div>
         </div>

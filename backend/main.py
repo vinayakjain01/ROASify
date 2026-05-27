@@ -37,7 +37,6 @@ def df_to_records(df: pd.DataFrame) -> list:
         for row in df.to_dict(orient="records")
     ]
 
-
 @app.post("/api/analyse")
 async def analyse(
     meta_file: UploadFile = File(...),
