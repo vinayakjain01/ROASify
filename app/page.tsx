@@ -57,9 +57,17 @@ export default function QuadrantViewPage() {
     <QuadrantPanel
       spendThreshold={spendThreshold}
       revenueThreshold={revenueThreshold}
-      onSpendChange={setSpendPct}
-      onRevenueChange={setRevPct}
-      onReset={() => { setSpendPct(50); setRevPct(50); }}
+
+      spendPct={spendPct}
+      revPct={revPct}
+
+      onSpendPctChange={setSpendPct}
+      onRevPctChange={setRevPct}
+
+      onReset={() => {
+        setSpendPct(50);
+        setRevPct(50);
+      }}
     />
   );
 

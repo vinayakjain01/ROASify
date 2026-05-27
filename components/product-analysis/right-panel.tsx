@@ -2,7 +2,7 @@
 
 import { useApp } from '@/lib/context';
 import type { Product } from '@/lib/context';
-import { inr, roiColor } from '@/lib/formatters';
+import { inr, roi, roiColor } from '@/lib/formatters';
 import { PanelSection, PanelRow, SourceItem } from '@/components/layout/right-panel';
 
 function getSpend(p: Product): number   { return p['Total Spend']    ?? (p as any).totalSpend ?? 0; }
@@ -25,10 +25,10 @@ export function ProductAnalysisPanel() {
   const googleCost   = mergedSummary?.google_cost ?? 0;
   const overallRoi   = mergedSummary?.roi         ?? (totalSpend > 0 ? totalRevenue / totalSpend : 0);
 
-  const avgSpend   = count > 0 ? totalSpend   / count : 0;
-  const avgRevenue = count > 0 ? totalRevenue / count : 0;
-  const avgMetaSpend   = count > 0 && metaSpend   > 0 ? metaSpend   / count : avgSpend * 0.77;
-  const avgGoogleCost  = count > 0 && googleCost  > 0 ? googleCost  / count : avgSpend * 0.23;
+  const avgSpend      = count > 0 ? totalSpend   / count : 0;
+  const avgRevenue    = count > 0 ? totalRevenue / count : 0;
+  const avgMetaSpend  = count > 0 && metaSpend  > 0 ? metaSpend  / count : avgSpend * 0.77;
+  const avgGoogleCost = count > 0 && googleCost > 0 ? googleCost / count : avgSpend * 0.23;
   const avgLpv = count > 0
     ? Math.round(products.reduce((s, p) => s + getItemsSold(p), 0) / count)
     : 0;
@@ -69,11 +69,11 @@ export function ProductAnalysisPanel() {
       {count > 0 && (
         <PanelSection title="Averages per product">
           <div className="space-y-1">
-            <PanelRow label="Avg Meta Spend"   value={fmt(avgMetaSpend)} />
-            <PanelRow label="Avg Google Spend" value={fmt(avgGoogleCost)} />
-            <PanelRow label="Avg Total Spend"  value={fmt(avgSpend)} />
-            <PanelRow label="Avg Revenue"      value={fmt(avgRevenue)} />
-            <PanelRow label="Avg ROI"          value={roiColor(overallRoi)} />
+            <PanelRow label="Avg Meta Spend"    value={fmt(avgMetaSpend)} />
+            <PanelRow label="Avg Google Spend"  value={fmt(avgGoogleCost)} />
+            <PanelRow label="Avg Total Spend"   value={fmt(avgSpend)} />
+            <PanelRow label="Avg Revenue"       value={fmt(avgRevenue)} />
+            <PanelRow label="Avg ROI"           value={roi(overallRoi)} />
             <PanelRow label="Avg Units/Product" value={avgLpv.toLocaleString('en-IN')} />
           </div>
         </PanelSection>

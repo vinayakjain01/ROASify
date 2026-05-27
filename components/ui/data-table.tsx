@@ -12,6 +12,24 @@ interface DataTableProps {
   className?: string;
 }
 
+// Column width hints: 'shrink' = content-only, 'grow' = flexible, 'fixed-Npx' = fixed
+const columnWidth: Record<string, string> = {
+  id:         'w-[120px] min-w-[80px]',
+  title:      'min-w-[160px] max-w-[240px]',
+  variant:    'w-[80px] min-w-[60px]',
+  metaSpend:  'w-[110px]',
+  googleCost: 'w-[110px]',
+  totalSpend: 'w-[110px]',
+  revenue:    'w-[110px]',
+  roi:        'w-[70px]',
+  itemsSold:  'w-[90px]',
+  ctr:        'w-[60px]',
+  cpm:        'w-[70px]',
+  category:   'w-[100px]',
+  quadrant:   'w-[100px]',
+  discounted: 'w-[110px]',
+};
+
 export function DataTable({ 
   products, 
   columns = ['id', 'title', 'variant', 'metaSpend', 'totalSpend', 'revenue', 'roi', 'itemsSold', 'ctr', 'cpm'],
@@ -21,7 +39,7 @@ export function DataTable({
   const columnLabels: Record<string, string> = {
     id: 'Product ID',
     title: 'Product Title',
-    variant: 'Variant Title',
+    variant: 'Variant',
     metaSpend: 'Meta Spend',
     googleCost: 'Google Cost',
     totalSpend: 'Total Spend',
@@ -41,20 +59,24 @@ export function DataTable({
     switch (column) {
       case 'id':
         return (
-          <span className="font-mono text-[13px] text-[#8B8780]">
+          <span className="font-mono text-[12px] text-[#8B8780] truncate block max-w-[120px]" title={String(value || '')}>
             {String(value || '')}
           </span>
         );
 
       case 'title':
         return (
-          <span className="font-medium">
+          <span className="font-medium truncate block max-w-[240px]" title={String(value || '')}>
             {String(value || '')}
           </span>
         );
 
       case 'variant':
-        return String(value || '');
+        return (
+          <span className="truncate block max-w-[80px]" title={String(value || '')}>
+            {String(value || '')}
+          </span>
+        );
 
       case 'metaSpend':
       case 'googleCost':
@@ -68,12 +90,7 @@ export function DataTable({
 
       case 'roi':
         return (
-          <span
-            className={cn(
-              "tabular-nums font-medium",
-              roiColor(Number(value || 0))
-            )}
-          >
+          <span className={cn("tabular-nums font-medium", roiColor(Number(value || 0)))}>
             {roi(Number(value || 0))}
           </span>
         );
@@ -103,11 +120,7 @@ export function DataTable({
         return String(value || '');
 
       case 'quadrant':
-        return (
-          <QuadrantTag
-            quadrant={String(value || 'cruisers')}
-          />
-        );
+        return <QuadrantTag quadrant={String(value || 'cruisers')} />;
 
       case 'discounted':
         return Boolean(value) ? (
@@ -128,13 +141,18 @@ export function DataTable({
   return (
     <div className={cn("bg-white rounded-[10px] border border-[#EEECE5] overflow-hidden", className)}>
       <div className="overflow-auto" style={{ maxHeight }}>
-        <table className="w-full">
+        <table className="w-full table-fixed">
+          <colgroup>
+            {columns.map((col) => (
+              <col key={col} className={columnWidth[col] || 'w-[100px]'} />
+            ))}
+          </colgroup>
           <thead className="sticky top-0 bg-[#F2F0EA] z-10">
             <tr>
               {columns.map((col) => (
                 <th 
                   key={col}
-                  className="px-4 py-3 text-left text-[12px] font-medium text-[#8B8780] uppercase tracking-wider whitespace-nowrap"
+                  className="px-3 py-3 text-left text-[11px] font-medium text-[#8B8780] uppercase tracking-wider whitespace-nowrap overflow-hidden"
                 >
                   {columnLabels[col] || col}
                 </th>
@@ -148,7 +166,7 @@ export function DataTable({
                 className="hover:bg-[#F2F0EA] transition-colors duration-75"
               >
                 {columns.map((col) => (
-                  <td key={col} className="px-4 py-3 text-sm text-[#1A1814] whitespace-nowrap">
+                  <td key={col} className="px-3 py-2.5 text-sm text-[#1A1814] overflow-hidden">
                     {formatCell(product, col)}
                   </td>
                 ))}
@@ -163,10 +181,10 @@ export function DataTable({
 
 function QuadrantTag({ quadrant }: { quadrant: string }) {
   const styles: Record<string, { bg: string; text: string; label: string }> = {
-    champions: { bg: 'bg-[#E7F7F0]', text: 'text-[#10B981]', label: 'Champion' },
+    champions:  { bg: 'bg-[#E7F7F0]', text: 'text-[#10B981]', label: 'Champion'  },
     contenders: { bg: 'bg-[#EAF1FE]', text: 'text-[#3B82F6]', label: 'Contender' },
-    cruisers: { bg: 'bg-[#F2F0EC]', text: 'text-[#78716C]', label: 'Cruiser' },
-    casualties: { bg: 'bg-[#FDECEC]', text: 'text-[#EF4444]', label: 'Casualty' },
+    cruisers:   { bg: 'bg-[#F2F0EC]', text: 'text-[#78716C]', label: 'Cruiser'   },
+    casualties: { bg: 'bg-[#FDECEC]', text: 'text-[#EF4444]', label: 'Casualty'  },
   };
   
   const style = styles[quadrant] || styles.cruisers;

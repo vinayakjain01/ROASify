@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { KpiStrip } from '@/components/ui/kpi-card';
@@ -12,29 +12,28 @@ import { QuadrantPanel } from '@/components/quadrant-view/right-panel';
 import { useApp } from '@/lib/context';
 import type { Product } from '@/lib/context';
 
-function getRoi(p: Product): number {
-  return p.ROI ?? (p['Shopify Revenue'] && p['Total Spend'] ? p['Shopify Revenue'] / p['Total Spend'] : 0);
+function getSpend(p: Product): number   { return p['Total Spend']    ?? (p as any).totalSpend ?? 0; }
+function getRevenue(p: Product): number { return p['Shopify Revenue'] ?? (p as any).revenue    ?? 0; }
+
+function pctIndex(arr: number[], pct: number): number {
+  if (arr.length === 0) return 0;
+  return arr[Math.max(0, Math.floor((pct / 100) * arr.length) - 1)] ?? 0;
 }
-function getSpend(p: Product): number { return p['Total Spend'] ?? (p as any).totalSpend ?? 0; }
-function getRevenue(p: Product): number { return p['Shopify Revenue'] ?? (p as any).revenue ?? 0; }
 
 export default function QuadrantViewPage() {
   const { mergedData, mergedSummary } = useApp();
   const [slideoverOpen, setSlideoverOpen] = useState(false);
-  const [spendPct, setSpendPct] = useState(50);
-  const [revPct, setRevPct] = useState(50);
+  const [spendPct, setSpendPct]   = useState(50);
+  const [revPct,   setRevPct]     = useState(50);
 
   const products = mergedData ?? [];
 
-  // Compute thresholds as percentiles of actual data
-  const spends   = products.map(getSpend).sort((a, b) => a - b);
-  const revenues = products.map(getRevenue).sort((a, b) => a - b);
+  // Sorted arrays for percentile computation
+  const sortedSpends    = useMemo(() => products.map(getSpend).sort((a, b) => a - b),   [products]);
+  const sortedRevenues  = useMemo(() => products.map(getRevenue).sort((a, b) => a - b), [products]);
 
-  const pctIndex = (arr: number[], pct: number) =>
-    arr[Math.max(0, Math.floor((pct / 100) * arr.length) - 1)] ?? 0;
-
-  const spendThreshold   = spends.length   > 0 ? pctIndex(spends,   spendPct)   : 61000;
-  const revenueThreshold = revenues.length > 0 ? pctIndex(revenues, revPct)     : 330000;
+  const spendThreshold   = useMemo(() => sortedSpends.length   > 0 ? pctIndex(sortedSpends,   spendPct) : 61000,   [sortedSpends,   spendPct]);
+  const revenueThreshold = useMemo(() => sortedRevenues.length > 0 ? pctIndex(sortedRevenues, revPct)   : 330000,  [sortedRevenues, revPct]);
 
   const totalSpend   = products.reduce((s, p) => s + getSpend(p), 0);
   const totalRevenue = products.reduce((s, p) => s + getRevenue(p), 0);
@@ -57,8 +56,10 @@ export default function QuadrantViewPage() {
     <QuadrantPanel
       spendThreshold={spendThreshold}
       revenueThreshold={revenueThreshold}
-      onSpendChange={setSpendPct}
-      onRevenueChange={setRevPct}
+      spendPct={spendPct}
+      revPct={revPct}
+      onSpendPctChange={setSpendPct}
+      onRevPctChange={setRevPct}
       onReset={() => { setSpendPct(50); setRevPct(50); }}
     />
   );
@@ -113,11 +114,17 @@ export default function QuadrantViewPage() {
           <KpiStrip cards={kpiCards} className="mb-6" />
 
           <div className="mb-5">
-            <ChampionsHero spendThreshold={spendThreshold} revenueThreshold={revenueThreshold} />
+            <ChampionsHero
+              spendThreshold={spendThreshold}
+              revenueThreshold={revenueThreshold}
+            />
           </div>
 
           <div className="mb-5">
-            <QuadrantGrid spendThreshold={spendThreshold} revenueThreshold={revenueThreshold} />
+            <QuadrantGrid
+              spendThreshold={spendThreshold}
+              revenueThreshold={revenueThreshold}
+            />
           </div>
 
           <AIAnalysis />

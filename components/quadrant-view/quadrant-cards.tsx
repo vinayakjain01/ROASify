@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, Star, Diamond, Circle, Triangle } from 'lucide-react';
+import { ChevronDown, Star, Diamond, Circle, Triangle, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/lib/context';
 import type { Product } from '@/lib/context';
@@ -31,6 +31,38 @@ const quadrantConfig: Record<QuadrantKey, { icon: any; label: string; tag: strin
   casualties: { icon: Triangle, label: 'Casualties', tag: 'Cut',     description: 'Low revenue · High spend'  },
 };
 
+function downloadQuadrantCSV(quadrant: QuadrantKey, products: Product[]) {
+  const rows: string[][] = [];
+  rows.push([`ROASify — ${quadrantConfig[quadrant].label} Quadrant Export`]);
+  rows.push(['Generated', new Date().toLocaleString('en-IN')]);
+  rows.push(['Products', String(products.length)]);
+  rows.push([]);
+  rows.push(['Product ID', 'Product Title', 'Variant', 'Total Spend', 'Revenue', 'ROI', 'Items Sold', 'CTR', 'CPM']);
+  for (const p of products) {
+    rows.push([
+      String(p['Product ID']      ?? (p as any).id       ?? ''),
+      String(p['Product Title']   ?? (p as any).title    ?? ''),
+      String(p['Variant Title']   ?? (p as any).variant  ?? ''),
+      String(getSpend(p)),
+      String(getRevenue(p)),
+      String(getRoi(p).toFixed(2)),
+      String(p['Net Items Sold']  ?? (p as any).itemsSold ?? 0),
+      String(p['CTR']             ?? (p as any).ctr       ?? 0),
+      String(p['CPM']             ?? (p as any).cpm       ?? 0),
+    ]);
+  }
+  const csv = rows
+    .map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `roasify_${quadrant}_${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 interface QuadrantCardProps {
   quadrant: QuadrantKey;
   products: Product[];
@@ -46,7 +78,6 @@ function QuadrantCard({ quadrant, products }: QuadrantCardProps) {
   const revenue = products.reduce((s, p) => s + getRevenue(p), 0);
   const roiVal  = spend > 0 ? revenue / spend : 0;
 
-  // Map context Products to ProductRow for DataTable
   const rows: ProductRow[] = products.map(p => ({
     id:         p['Product ID']      ?? (p as any).id,
     title:      p['Product Title']   ?? (p as any).title,
@@ -56,7 +87,7 @@ function QuadrantCard({ quadrant, products }: QuadrantCardProps) {
     totalSpend: getSpend(p),
     revenue:    getRevenue(p),
     roi:        getRoi(p),
-    itemsSold:  getRevenue(p) > 0 ? (p['Net Items Sold'] ?? (p as any).itemsSold ?? 0) : 0,
+    itemsSold:  p['Net Items Sold']  ?? (p as any).itemsSold ?? 0,
     ctr:        p['CTR']             ?? (p as any).ctr ?? 0,
     cpm:        p['CPM']             ?? (p as any).cpm ?? 0,
   }));
@@ -81,6 +112,16 @@ function QuadrantCard({ quadrant, products }: QuadrantCardProps) {
               <div className="text-xs text-[#8B8780] mt-0.5">{config.description}</div>
             </div>
           </div>
+
+          {/* Download button per quadrant */}
+          <button
+            onClick={() => downloadQuadrantCSV(quadrant, products)}
+            disabled={products.length === 0}
+            title={`Download ${config.label} CSV`}
+            className="p-1.5 rounded-md hover:bg-[#F2F0EA] text-[#8B8780] hover:text-[#1A1814] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Download className="w-4 h-4" />
+          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
