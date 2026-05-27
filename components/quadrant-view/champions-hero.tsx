@@ -3,7 +3,7 @@
 import { ArrowRight, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getQuadrantData, topPerformers } from '@/lib/data';
-import { formatCurrency, formatRoi } from '@/lib/formatters';
+import { inr, roi } from '@/lib/formatters';
 
 export function ChampionsHero() {
   const championsData = getQuadrantData('champions');
@@ -11,9 +11,9 @@ export function ChampionsHero() {
   const estimatedAdditionalRevenue = championsData.spend * 0.5 * championsData.roi;
 
   const narratives = [
-    `${champions[0].title} returns ${formatRoi(champions[0].roi)} per rupee — scale aggressively while maintaining creative quality.`,
-    `${champions[1].title} delivers ${formatRoi(champions[1].roi)} ROI with strong unit economics. Prime candidate for budget increase.`,
-    `${champions[2].title} achieves ${formatRoi(champions[2].roi)} ROI on premium home goods. Expand audience targeting.`,
+    `${champions[0].title} returns ${roi(champions[0].roi)} per rupee — scale aggressively while maintaining creative quality.`,
+    `${champions[1].title} delivers ${roi(champions[1].roi)} ROI with strong unit economics. Prime candidate for budget increase.`,
+    `${champions[2].title} achieves ${roi(champions[2].roi)} ROI on premium home goods. Expand audience targeting.`,
   ];
 
   return (
@@ -33,8 +33,8 @@ export function ChampionsHero() {
         {/* Headline */}
         <h2 className="text-[22px] font-medium text-[#1A1814] leading-snug mb-6">
           <span className="text-[#10B981]">{championsData.count} Champions</span> together return{' '}
-          <span className="text-[#10B981]">{formatRoi(championsData.roi)}</span> on{' '}
-          {formatCurrency(championsData.spend)} of spend — the highest payoff on meaningful volume in this dataset.
+          <span className="text-[#10B981]">{roi(championsData.roi)}</span> on{' '}
+          {inr(championsData.spend)} of spend — the highest payoff on meaningful volume in this dataset.
         </h2>
 
         {/* Winner Cards */}
@@ -47,11 +47,11 @@ export function ChampionsHero() {
               <div className="flex items-start justify-between mb-2">
                 <div className="font-medium text-[#1A1814] text-sm">{product.title}</div>
                 <div className="text-lg font-semibold text-[#10B981] tabular-nums">
-                  {formatRoi(product.roi)}
+                  {roi(product.roi)}
                 </div>
               </div>
               <div className="text-xs text-[#8B8780] mb-2">
-                Spend {formatCurrency(product.totalSpend)} · Revenue {formatCurrency(product.revenue)} · {product.itemsSold} units
+                Spend {inr(product.totalSpend)} · Revenue {inr(product.revenue)} · {product.itemsSold} units
               </div>
               <p className="text-xs text-[#57544E] line-clamp-2">
                 {narratives[index]}
@@ -64,7 +64,7 @@ export function ChampionsHero() {
         <div className="flex items-center justify-between p-4 bg-[#FAFAF8] rounded-lg border border-[#EEECE5]">
           <p className="text-sm text-[#57544E]">
             Scale spend on these products. Estimated additional revenue at current ROI:{' '}
-            <span className="font-medium text-[#1A1814]">{formatCurrency(estimatedAdditionalRevenue)}</span>
+            <span className="font-medium text-[#1A1814]">{inr(estimatedAdditionalRevenue)}</span>
           </p>
           <Button className="bg-[#4F46E5] hover:bg-[#4338CA]">
             Create scale-spend plan

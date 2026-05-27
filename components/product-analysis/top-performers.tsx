@@ -1,13 +1,13 @@
 'use client';
 
 import { topPerformers } from '@/lib/data';
-import { formatCurrency, formatRoi } from '@/lib/formatters';
+import { inr, roiColor } from '@/lib/formatters';
 
 export function TopPerformers() {
   const narratives = [
-    `${topPerformers[0].title} returns ${formatRoi(topPerformers[0].roi)} per rupee spent — the highest ROI in this dataset with meaningful volume.`,
-    `${topPerformers[1].title} delivers exceptional efficiency at ${formatRoi(topPerformers[1].roi)} ROI while moving ${topPerformers[1].itemsSold.toLocaleString()} units.`,
-    `${topPerformers[2].title} achieves ${formatRoi(topPerformers[2].roi)} ROI on premium home goods with strong unit economics.`
+    `${topPerformers[0].title} returns ${roiColor(topPerformers[0].roi)} per rupee spent — the highest ROI in this dataset with meaningful volume.`,
+    `${topPerformers[1].title} delivers exceptional efficiency at ${roiColor(topPerformers[1].roi)} ROI while moving ${topPerformers[1].itemsSold.toLocaleString()} units.`,
+    `${topPerformers[2].title} achieves ${roiColor(topPerformers[2].roi)} ROI on premium home goods with strong unit economics.`
   ];
 
   return (
@@ -37,11 +37,11 @@ export function TopPerformers() {
                 </div>
               </div>
               <div className="text-lg font-semibold text-[#10B981] tabular-nums">
-                {formatRoi(product.roi)}
+                {roiColor(product.roi)}
               </div>
             </div>
             <div className="text-sm text-[#8B8780] mb-3">
-              Spend {formatCurrency(product.totalSpend)} · Revenue {formatCurrency(product.revenue)} · {product.itemsSold.toLocaleString()} units
+              Spend {inr(product.totalSpend)} · Revenue {inr(product.revenue)} · {product.itemsSold.toLocaleString()} units
             </div>
             <p className="text-sm text-[#57544E] line-clamp-2">
               {narratives[index]}

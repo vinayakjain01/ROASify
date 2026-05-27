@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { ChevronDown, Star, Diamond, Circle, Triangle, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getQuadrantData, type Quadrant, type Product } from '@/lib/data';
-import { formatCurrency, formatRoi, getQuadrantColor, getRoiColor } from '@/lib/formatters';
+import { inr, roi, getQuadrantColor, roiColor } from '@/lib/formatters';
 import { DataTable } from '@/components/ui/data-table';
+import type { ProductRow } from '@/lib/api';
 
 interface QuadrantCardProps {
   quadrant: Quadrant;
@@ -81,16 +82,16 @@ export function QuadrantCard({ quadrant, spendThreshold, revenueThreshold }: Qua
           </div>
           <div>
             <div className="text-xs text-[#8B8780] uppercase tracking-wider">Spend</div>
-            <div className="text-xl font-semibold text-[#1A1814] tabular-nums">{formatCurrency(data.spend)}</div>
+            <div className="text-xl font-semibold text-[#1A1814] tabular-nums">{inr(data.spend)}</div>
           </div>
           <div>
             <div className="text-xs text-[#8B8780] uppercase tracking-wider">Revenue</div>
-            <div className="text-xl font-semibold text-[#1A1814] tabular-nums">{formatCurrency(data.revenue)}</div>
+            <div className="text-xl font-semibold text-[#1A1814] tabular-nums">{inr(data.revenue)}</div>
           </div>
           <div>
             <div className="text-xs text-[#8B8780] uppercase tracking-wider">ROI</div>
-            <div className={cn("text-xl font-semibold tabular-nums", getRoiColor(data.roi))}>
-              {formatRoi(data.roi)}
+            <div className={cn("text-xl font-semibold tabular-nums", roiColor(data.roi))}>
+              {roi(data.roi)}
             </div>
           </div>
         </div>
@@ -111,11 +112,7 @@ export function QuadrantCard({ quadrant, spendThreshold, revenueThreshold }: Qua
       {/* Expanded Table */}
       {expanded && (
         <div className="border-t border-[#EEECE5]">
-          <DataTable 
-            products={data.products} 
-            columns={['id', 'title', 'totalSpend', 'revenue', 'roi']}
-            maxHeight="300px"
-          />
+          <DataTable products={data.products as ProductRow[]} />
         </div>
       )}
     </div>

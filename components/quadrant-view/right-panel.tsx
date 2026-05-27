@@ -1,7 +1,7 @@
 'use client';
 
 import { getQuadrantData, runMetadata } from '@/lib/data';
-import { formatCurrency, formatRoi, getQuadrantColor } from '@/lib/formatters';
+import { inr, roi , getQuadrantColor } from '@/lib/formatters';
 import { PanelSection, PanelRow } from '@/components/layout/right-panel';
 import { Slider } from '@/components/ui/slider';
 
@@ -34,7 +34,7 @@ export function QuadrantPanel({
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-[#57544E]">Spend cut-off (X)</span>
               <span className="text-sm font-medium text-[#1A1814] tabular-nums">
-                {formatCurrency(spendThreshold)}
+                {inr(spendThreshold)}
               </span>
             </div>
             <Slider
@@ -51,7 +51,7 @@ export function QuadrantPanel({
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-[#57544E]">Revenue cut-off (Y)</span>
               <span className="text-sm font-medium text-[#1A1814] tabular-nums">
-                {formatCurrency(revenueThreshold)}
+                {inr(revenueThreshold)}
               </span>
             </div>
             <Slider
@@ -81,12 +81,12 @@ export function QuadrantPanel({
             return (
               <div key={q} className="flex items-center justify-between py-1">
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
+                  <div className={`w-2 h-2 rounded-full ${colors}`} />
                   <span className="text-sm text-[#1A1814] capitalize">{q}</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="text-sm text-[#1A1814] tabular-nums">{data.count}</span>
-                  <span className={`text-sm tabular-nums ${colors.text}`}>{formatRoi(data.roi)}</span>
+                  <span className={`text-sm tabular-nums ${colors.text}`}>{roi(data.roi)}</span>
                 </div>
               </div>
             );

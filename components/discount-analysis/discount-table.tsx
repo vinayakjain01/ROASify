@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { products } from '@/lib/data';
-import { formatCurrency, formatRoi, getRoiColor } from '@/lib/formatters';
+import { inr, roi, roiColor } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 
 type StrategyFilter = 'all' | 'discounted' | 'non-discounted';
@@ -74,12 +74,12 @@ export function DiscountTable() {
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-sm text-[#1A1814] tabular-nums">{formatCurrency(product.totalSpend)}</td>
-                <td className="px-4 py-3 text-sm text-[#1A1814] tabular-nums">{formatCurrency(product.revenue)}</td>
+                <td className="px-4 py-3 text-sm text-[#1A1814] tabular-nums">{inr(product.totalSpend)}</td>
+                <td className="px-4 py-3 text-sm text-[#1A1814] tabular-nums">{inr(product.revenue)}</td>
                 <td className="px-4 py-3 text-sm text-[#1A1814] tabular-nums">{product.itemsSold.toLocaleString()}</td>
                 <td className="px-4 py-3">
-                  <span className={cn("text-sm font-medium tabular-nums", getRoiColor(product.roi))}>
-                    {formatRoi(product.roi)}
+                  <span className={cn("text-sm font-medium tabular-nums", roiColor(product.roi))}>
+                    {roi(product.roi)}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm text-[#1A1814] tabular-nums">{product.ctr.toFixed(1)}%</td>

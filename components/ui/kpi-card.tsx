@@ -1,6 +1,6 @@
 'use client';
 
-import { formatCurrency, formatRoi, formatPercentage } from '@/lib/formatters';
+import { inr, roi, pct } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 
 interface KpiCardProps {
@@ -45,9 +45,9 @@ export function KpiCard({
   const formattedValue = (() => {
     if (typeof value === 'string') return value;
     switch (format) {
-      case 'currency': return formatCurrency(value);
-      case 'roi': return formatRoi(value);
-      case 'percentage': return formatPercentage(value, false);
+      case 'currency': return inr(value);
+      case 'roi': return roi(value);
+      case 'percentage': return pct(value);
       case 'number': return value.toLocaleString('en-IN');
       default: return String(value);
     }

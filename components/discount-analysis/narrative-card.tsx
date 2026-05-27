@@ -1,7 +1,7 @@
 'use client';
 
 import { discountedStats, nonDiscountedStats } from '@/lib/data';
-import { formatCurrency, formatRoi } from '@/lib/formatters';
+import { inr, roi } from '@/lib/formatters';
 
 export function NarrativeCard() {
   const roiDiff = nonDiscountedStats.roi - discountedStats.roi;
@@ -21,8 +21,8 @@ export function NarrativeCard() {
               What changed
             </div>
             <p className="text-sm text-[#57544E] leading-relaxed">
-              Non-discounted products achieved {formatRoi(nonDiscountedStats.roi)} ROI compared to 
-              discounted products at {formatRoi(discountedStats.roi)} — a difference of {formatRoi(roiDiff)} per 
+              Non-discounted products achieved {roi(nonDiscountedStats.roi)} ROI compared to 
+              discounted products at {roi(discountedStats.roi)} — a difference of {roi(roiDiff)} per 
               rupee spent. This gap has widened by 0.4x compared to last period.
             </p>
           </div>
@@ -34,9 +34,9 @@ export function NarrativeCard() {
             </div>
             <p className="text-sm text-[#57544E] leading-relaxed">
               Discounts are eroding margin faster than they are driving volume. The {discountedStats.count} discounted 
-              products consumed {formatCurrency(discountedStats.spend)} in ad spend but generated only{' '}
-              {formatCurrency(discountedStats.revenue)} in revenue. Meanwhile, {nonDiscountedStats.count} non-discounted 
-              products generated {formatCurrency(nonDiscountedStats.revenue)} on {formatCurrency(nonDiscountedStats.spend)} spend.
+              products consumed {inr(discountedStats.spend)} in ad spend but generated only{' '}
+              {inr(discountedStats.revenue)} in revenue. Meanwhile, {nonDiscountedStats.count} non-discounted 
+              products generated {inr(nonDiscountedStats.revenue)} on {inr(nonDiscountedStats.spend)} spend.
             </p>
           </div>
 

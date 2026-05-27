@@ -1,7 +1,7 @@
 'use client';
 
 import { discountedStats, nonDiscountedStats, runMetadata } from '@/lib/data';
-import { formatRoi } from '@/lib/formatters';
+import { roi } from '@/lib/formatters';
 import { PanelSection } from '@/components/layout/right-panel';
 
 export function DiscountPanel() {
@@ -30,11 +30,11 @@ export function DiscountPanel() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-[#57544E]">Discounted ROI</span>
-            <span className="text-sm font-medium text-[#B45309] tabular-nums">{formatRoi(discountedStats.roi)}</span>
+            <span className="text-sm font-medium text-[#B45309] tabular-nums">{roi(discountedStats.roi)}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-[#57544E]">Non-disc. ROI</span>
-            <span className="text-sm font-medium text-[#4F46E5] tabular-nums">{formatRoi(nonDiscountedStats.roi)}</span>
+            <span className="text-sm font-medium text-[#4F46E5] tabular-nums">{roi(nonDiscountedStats.roi)}</span>
           </div>
           <div className="flex items-center justify-between pt-2 border-t border-[#EEECE5]">
             <span className="text-sm text-[#57544E]">Advantage</span>

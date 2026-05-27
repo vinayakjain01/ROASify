@@ -465,7 +465,7 @@ export const getQuadrantData = (quadrant: Quadrant) => {
     count: quadrantProducts.length,
     spend,
     revenue,
-    roi: revenue / spend
+    roi: revenue / spend,
   };
 };
 
@@ -473,25 +473,29 @@ export const getQuadrantData = (quadrant: Quadrant) => {
 export const discountedProducts = products.filter(p => p.discounted);
 export const nonDiscountedProducts = products.filter(p => !p.discounted);
 
+const _dSpend = discountedProducts.reduce((sum, p) => sum + p.totalSpend, 0);
+const _dRevenue = discountedProducts.reduce((sum, p) => sum + p.revenue, 0);
 export const discountedStats = {
   count: discountedProducts.length,
-  spend: discountedProducts.reduce((sum, p) => sum + p.totalSpend, 0),
-  revenue: discountedProducts.reduce((sum, p) => sum + p.revenue, 0),
+  spend: _dSpend,
+  revenue: _dRevenue,
+  roi: _dRevenue / _dSpend,
   items: discountedProducts.reduce((sum, p) => sum + p.itemsSold, 0),
   avgCtr: discountedProducts.reduce((sum, p) => sum + p.ctr, 0) / discountedProducts.length,
   avgCpm: discountedProducts.reduce((sum, p) => sum + p.cpm, 0) / discountedProducts.length
 };
-discountedStats.roi = discountedStats.revenue / discountedStats.spend;
 
+const _ndSpend = nonDiscountedProducts.reduce((sum, p) => sum + p.totalSpend, 0);
+const _ndRevenue = nonDiscountedProducts.reduce((sum, p) => sum + p.revenue, 0);
 export const nonDiscountedStats = {
   count: nonDiscountedProducts.length,
-  spend: nonDiscountedProducts.reduce((sum, p) => sum + p.totalSpend, 0),
-  revenue: nonDiscountedProducts.reduce((sum, p) => sum + p.revenue, 0),
+  spend: _ndSpend,
+  revenue: _ndRevenue,
+  roi: _ndRevenue / _ndSpend,
   items: nonDiscountedProducts.reduce((sum, p) => sum + p.itemsSold, 0),
   avgCtr: nonDiscountedProducts.reduce((sum, p) => sum + p.ctr, 0) / nonDiscountedProducts.length,
   avgCpm: nonDiscountedProducts.reduce((sum, p) => sum + p.cpm, 0) / nonDiscountedProducts.length
 };
-nonDiscountedStats.roi = nonDiscountedStats.revenue / nonDiscountedStats.spend;
 
 // Top performers (highest ROI)
 export const topPerformers = [...products].sort((a, b) => b.roi - a.roi).slice(0, 3);

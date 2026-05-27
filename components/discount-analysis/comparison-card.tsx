@@ -1,7 +1,7 @@
 'use client';
 
 import { discountedStats, nonDiscountedStats } from '@/lib/data';
-import { formatCurrency, formatRoi } from '@/lib/formatters';
+import { inr, roi } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 
 interface MetricRowProps {
@@ -108,20 +108,20 @@ export function ComparisonCard() {
           label="Spend"
           discountedValue={discountedStats.spend}
           nonDiscountedValue={nonDiscountedStats.spend}
-          format={formatCurrency}
+          format={inr}
           higherIsBetter={false}
         />
         <MetricRow 
           label="Revenue"
           discountedValue={discountedStats.revenue}
           nonDiscountedValue={nonDiscountedStats.revenue}
-          format={formatCurrency}
+          format={inr}
         />
         <MetricRow 
           label="ROI"
           discountedValue={discountedStats.roi}
           nonDiscountedValue={nonDiscountedStats.roi}
-          format={formatRoi}
+          format={roi}
         />
         <MetricRow 
           label="Items Sold"

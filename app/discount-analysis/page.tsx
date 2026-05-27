@@ -11,10 +11,10 @@ import { discountedStats, nonDiscountedStats } from '@/lib/data';
 
 export default function DiscountAnalysisPage() {
   const kpiCards = [
-    { label: 'DISCOUNTED', value: discountedStats.count, format: 'number' as const, showSparkline: false },
+    { label: 'DISCOUNTED',     value: discountedStats.count,    format: 'number' as const, showSparkline: false },
     { label: 'NON-DISCOUNTED', value: nonDiscountedStats.count, format: 'number' as const, showSparkline: false },
-    { label: 'DISCOUNTED ROI', value: discountedStats.roi, format: 'roi' as const, showSparkline: false },
-    { label: 'NON-DISC. ROI', value: nonDiscountedStats.roi, format: 'roi' as const, showSparkline: false },
+    { label: 'DISCOUNTED ROI', value: discountedStats.roi,      format: 'roi'    as const, showSparkline: false },
+    { label: 'NON-DISC. ROI',  value: nonDiscountedStats.roi,   format: 'roi'    as const, showSparkline: false },
   ];
 
   const breadcrumbs = [
@@ -24,35 +24,36 @@ export default function DiscountAnalysisPage() {
   ];
 
   return (
-    <DashboardLayout 
+    <DashboardLayout
       breadcrumbs={breadcrumbs}
       rightPanel={<DiscountPanel />}
+      rightPanelTitle="Insights"
     >
       {/* Page Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl font-semibold text-[#1A1814] mb-1">
           Discount vs Non-Discount
         </h1>
-        <p className="text-[#57544E]">
+        <p className="text-sm text-[#57544E]">
           Compare the performance of discounted and non-discounted products to optimize your pricing strategy.
         </p>
       </div>
 
       {/* KPI Strip */}
-      <KpiStrip cards={kpiCards} className="mb-8" />
+      <KpiStrip cards={kpiCards} className="mb-6" />
 
       {/* Hero Card */}
-      <div className="mb-6">
+      <div className="mb-5">
         <DiscountHero />
       </div>
 
       {/* Comparison Card */}
-      <div className="mb-6">
+      <div className="mb-5">
         <ComparisonCard />
       </div>
 
       {/* Narrative Card */}
-      <div className="mb-6">
+      <div className="mb-5">
         <NarrativeCard />
       </div>
 

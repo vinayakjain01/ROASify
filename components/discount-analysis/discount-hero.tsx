@@ -3,7 +3,7 @@
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { discountedStats, nonDiscountedStats } from '@/lib/data';
-import { formatCurrency, formatRoi } from '@/lib/formatters';
+import { inr, roi } from '@/lib/formatters';
 
 export function DiscountHero() {
   const roiAdvantage = nonDiscountedStats.roi / discountedStats.roi;
@@ -24,8 +24,8 @@ export function DiscountHero() {
             <h2 className="text-[22px] font-medium text-[#1A1814] leading-snug">
               Non-discounted products return{' '}
               <span className="text-[#4F46E5]">{roiAdvantage.toFixed(2)}x</span> more per rupee 
-              than discounted ones — <span className="text-[#4F46E5]">{formatRoi(nonDiscountedStats.roi)}</span> against{' '}
-              <span className="text-[#B45309]">{formatRoi(discountedStats.roi)}</span>.
+              than discounted ones — <span className="text-[#4F46E5]">{roi(nonDiscountedStats.roi)}</span> against{' '}
+              <span className="text-[#B45309]">{roi(discountedStats.roi)}</span>.
             </h2>
           </div>
 
@@ -41,7 +41,7 @@ export function DiscountHero() {
         {/* CTA Bar */}
         <div className="mt-6 flex items-center justify-between p-4 bg-[#FAFAF8] rounded-lg border border-[#EEECE5]">
           <p className="text-sm text-[#57544E]">
-            Reallocate <span className="font-medium text-[#1A1814]">{formatCurrency(reallocationAmount)}</span> from 
+            Reallocate <span className="font-medium text-[#1A1814]">{inr(reallocationAmount)}</span> from 
             discounted spend to your top non-discounted performers.
           </p>
           <Button className="bg-[#4F46E5] hover:bg-[#4338CA]">

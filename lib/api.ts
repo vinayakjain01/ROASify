@@ -1,12 +1,34 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-export interface ProductRow{
-   [key:string]:string|number|boolean
+export interface ProductRow {
+  id?: string;
+  title?: string;
+  variant?: string;
+
+  metaSpend?: number;
+  googleCost?: number;
+  totalSpend?: number;
+  revenue?: number;
+  roi?: number;
+
+  itemsSold?: number;
+  ctr?: number;
+  cpm?: number;
+
+  category?: string;
+  quadrant?: string;
+  discounted?: boolean;
+
+  [key: string]:
+    | string
+    | number
+    | boolean
+    | undefined;
 }
 
-export interface AnalyseResponse{
-   products:ProductRow[]
-   summary:any
+export interface AnalyseResponse {
+  products: ProductRow[];
+  summary: any;
 }
 
 async function post(path: string, body: FormData | object) {
