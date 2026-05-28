@@ -5,23 +5,23 @@ import { X, ChevronDown, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
-interface FilterChip {
+export interface FilterChip {
   id: string;
   label: string;
   source: string;
-  key: string; // actual data key
+  key: string;
 }
 
-const defaultChips: FilterChip[] = [
-  { id: '1', label: 'Meta Spend',    source: 'Meta',    key: 'metaSpend'  },
-  { id: '2', label: 'Google Cost',   source: 'Google',  key: 'googleCost' },
-  { id: '3', label: 'Total Spend',   source: 'Derived', key: 'totalSpend' },
-  { id: '4', label: 'Revenue',       source: 'Shopify', key: 'revenue'    },
-  { id: '5', label: 'ROI',           source: 'Derived', key: 'roi'        },
-  { id: '6', label: 'Items Sold',    source: 'Shopify', key: 'itemsSold'  },
-  { id: '7', label: 'CTR',           source: 'Meta',    key: 'ctr'        },
-  { id: '8', label: 'CPM',           source: 'Meta',    key: 'cpm'        },
-  { id: '9', label: 'Variant Title', source: 'Shopify', key: 'variant'    },
+export const ALL_CHIPS: FilterChip[] = [
+  { id: '1',  label: 'Meta Spend',    source: 'Meta',    key: 'metaSpend'  },
+  { id: '2',  label: 'Google Cost',   source: 'Google',  key: 'googleCost' },
+  { id: '3',  label: 'Total Spend',   source: 'Derived', key: 'totalSpend' },
+  { id: '4',  label: 'Revenue',       source: 'Shopify', key: 'revenue'    },
+  { id: '5',  label: 'ROI',           source: 'Derived', key: 'roi'        },
+  { id: '6',  label: 'Items Sold',    source: 'Shopify', key: 'itemsSold'  },
+  { id: '7',  label: 'CTR',           source: 'Meta',    key: 'ctr'        },
+  { id: '8',  label: 'CPM',           source: 'Meta',    key: 'cpm'        },
+  { id: '9',  label: 'Variant',       source: 'Shopify', key: 'variant'    },
 ];
 
 interface MetricFilter {
@@ -45,33 +45,42 @@ interface ColumnsAndFiltersProps {
 }
 
 export function ColumnsAndFilters({ onFiltersChange, onColumnsChange }: ColumnsAndFiltersProps) {
-  const [chips, setChips]               = useState<FilterChip[]>(defaultChips);
+  const [chips, setChips]                     = useState<FilterChip[]>(ALL_CHIPS);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const [filters, setFilters]           = useState<MetricFilter[]>([
-    { id: '1', metric: 'roi', operator: '>=', value: '0' }
-  ]);
+  const [addColOpen, setAddColOpen]           = useState(false);
+  const [filters, setFilters]                 = useState<MetricFilter[]>([]);
   const [activeFilterBadge, setActiveFilterBadge] = useState(0);
+
+  // Chips not yet shown
+  const hiddenChips = ALL_CHIPS.filter(c => !chips.find(s => s.id === c.id));
 
   const removeChip = (id: string) => {
     const updated = chips.filter(c => c.id !== id);
     setChips(updated);
-    onColumnsChange?.(updated.map(c => c.key));
+    // Always include id + title in columns regardless of chip state
+    const cols = ['id', 'title', ...updated.map(c => c.key)];
+    onColumnsChange?.(cols);
+  };
+
+  const addChip = (chip: FilterChip) => {
+    const updated = [...chips, chip];
+    setChips(updated);
+    const cols = ['id', 'title', ...updated.map(c => c.key)];
+    onColumnsChange?.(cols);
+    setAddColOpen(false);
   };
 
   const addFilter = () => {
     setFilters([...filters, { id: String(Date.now()), metric: '', operator: '>', value: '' }]);
+    setFiltersExpanded(true);
   };
 
-  const removeFilter = (id: string) => {
-    setFilters(filters.filter(f => f.id !== id));
-  };
+  const removeFilter = (id: string) => setFilters(filters.filter(f => f.id !== id));
 
-  const updateFilter = (id: string, field: keyof MetricFilter, value: string) => {
+  const updateFilter = (id: string, field: keyof MetricFilter, value: string) =>
     setFilters(filters.map(f => f.id === id ? { ...f, [field]: value } : f));
-  };
 
   const handleApply = () => {
-    // Build active filters from valid rows
     const active: ActiveFilter[] = filters
       .filter(f => f.metric && f.value !== '')
       .map(f => ({
@@ -82,7 +91,7 @@ export function ColumnsAndFilters({ onFiltersChange, onColumnsChange }: ColumnsA
       }));
     setActiveFilterBadge(active.length);
     onFiltersChange?.(active);
-    setFiltersExpanded(false); // close the accordion
+    setFiltersExpanded(false);
   };
 
   const handleClear = () => {
@@ -92,11 +101,11 @@ export function ColumnsAndFilters({ onFiltersChange, onColumnsChange }: ColumnsA
   };
 
   const handleReset = () => {
-    setChips(defaultChips);
-    setFilters([{ id: '1', metric: 'roi', operator: '>=', value: '0' }]);
+    setChips(ALL_CHIPS);
+    setFilters([]);
     setActiveFilterBadge(0);
     onFiltersChange?.([]);
-    onColumnsChange?.(defaultChips.map(c => c.key));
+    onColumnsChange?.(['id', 'title', ...ALL_CHIPS.map(c => c.key)]);
   };
 
   return (
@@ -111,9 +120,36 @@ export function ColumnsAndFilters({ onFiltersChange, onColumnsChange }: ColumnsA
 
       {/* Chips Section */}
       <div className="px-5 py-4 border-b border-[#EEECE5]">
-        <div className="text-xs font-medium text-[#8B8780] uppercase tracking-wider mb-3">
-          Columns shown
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-xs font-medium text-[#8B8780] uppercase tracking-wider">Columns shown</div>
+          {/* Add column button */}
+          {hiddenChips.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setAddColOpen(!addColOpen)}
+                className="flex items-center gap-1 text-xs text-[#4F46E5] hover:text-[#4338CA] font-medium"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add column
+              </button>
+              {addColOpen && (
+                <div className="absolute right-0 top-6 z-20 bg-white border border-[#EEECE5] rounded-lg shadow-lg py-1 min-w-[160px]">
+                  {hiddenChips.map(chip => (
+                    <button
+                      key={chip.id}
+                      onClick={() => addChip(chip)}
+                      className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-[#F2F0EA] transition-colors"
+                    >
+                      <span className="text-[#1A1814]">{chip.label}</span>
+                      <span className="text-[10px] text-[#8B8780] bg-[#F2F0EA] px-1.5 py-0.5 rounded ml-2">{chip.source}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
+
         <div className="flex flex-wrap gap-2">
           {chips.map((chip) => (
             <div
@@ -157,12 +193,15 @@ export function ColumnsAndFilters({ onFiltersChange, onColumnsChange }: ColumnsA
 
         {filtersExpanded && (
           <div className="px-5 pb-4 space-y-3">
+            {filters.length === 0 && (
+              <p className="text-sm text-[#8B8780] py-2">No filters yet. Click "Add filter" below.</p>
+            )}
             {filters.map((filter) => (
-              <div key={filter.id} className="grid grid-cols-[1fr_120px_1fr_32px] gap-3 items-center">
+              <div key={filter.id} className="grid grid-cols-[1fr_110px_1fr_32px] gap-2 items-center">
                 <select
                   value={filter.metric}
                   onChange={(e) => updateFilter(filter.id, 'metric', e.target.value)}
-                  className="h-9 px-3 bg-white border border-[#DEDBD2] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
+                  className="h-9 px-2 bg-white border border-[#DEDBD2] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
                 >
                   <option value="">Select metric</option>
                   <option value="roi">ROI</option>
@@ -177,7 +216,7 @@ export function ColumnsAndFilters({ onFiltersChange, onColumnsChange }: ColumnsA
                 <select
                   value={filter.operator}
                   onChange={(e) => updateFilter(filter.id, 'operator', e.target.value)}
-                  className="h-9 px-3 bg-white border border-[#DEDBD2] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
+                  className="h-9 px-2 bg-white border border-[#DEDBD2] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
                 >
                   <option value=">">{'>'}</option>
                   <option value="<">{'<'}</option>
@@ -188,53 +227,35 @@ export function ColumnsAndFilters({ onFiltersChange, onColumnsChange }: ColumnsA
                 </select>
 
                 {filter.operator === 'between' ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      placeholder="Min"
-                      value={filter.value}
+                  <div className="flex items-center gap-1">
+                    <input type="number" placeholder="Min" value={filter.value}
                       onChange={(e) => updateFilter(filter.id, 'value', e.target.value)}
-                      className="flex-1 h-9 px-3 bg-white border border-[#DEDBD2] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Max"
-                      value={filter.value2 || ''}
+                      className="flex-1 h-9 px-2 bg-white border border-[#DEDBD2] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]" />
+                    <input type="number" placeholder="Max" value={filter.value2 || ''}
                       onChange={(e) => updateFilter(filter.id, 'value2', e.target.value)}
-                      className="flex-1 h-9 px-3 bg-white border border-[#DEDBD2] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
-                    />
+                      className="flex-1 h-9 px-2 bg-white border border-[#DEDBD2] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]" />
                   </div>
                 ) : (
-                  <input
-                    type="number"
-                    placeholder="Value"
-                    value={filter.value}
+                  <input type="number" placeholder="Value" value={filter.value}
                     onChange={(e) => updateFilter(filter.id, 'value', e.target.value)}
-                    className="h-9 px-3 bg-white border border-[#DEDBD2] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
-                  />
+                    className="h-9 px-2 bg-white border border-[#DEDBD2] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]" />
                 )}
 
-                <button
-                  onClick={() => removeFilter(filter.id)}
-                  className="h-9 w-9 flex items-center justify-center hover:bg-[#F2F0EA] rounded-md transition-colors"
-                >
+                <button onClick={() => removeFilter(filter.id)}
+                  className="h-9 w-8 flex items-center justify-center hover:bg-[#F2F0EA] rounded-md transition-colors">
                   <X className="w-4 h-4 text-[#8B8780]" />
                 </button>
               </div>
             ))}
 
-            <button
-              onClick={addFilter}
-              className="flex items-center gap-2 text-sm text-[#4F46E5] hover:text-[#4338CA]"
-            >
+            <button onClick={addFilter}
+              className="flex items-center gap-2 text-sm text-[#4F46E5] hover:text-[#4338CA]">
               <Plus className="w-4 h-4" />
               Add filter
             </button>
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#EEECE5]">
-              <Button variant="ghost" size="sm" onClick={handleClear}>
-                Clear filters
-              </Button>
+              <Button variant="ghost" size="sm" onClick={handleClear}>Clear filters</Button>
               <Button size="sm" className="bg-[#4F46E5] hover:bg-[#4338CA]" onClick={handleApply}>
                 Apply filters
               </Button>

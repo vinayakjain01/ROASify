@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { KpiStrip } from '@/components/ui/kpi-card';
 import { DataTable } from '@/components/ui/data-table';
@@ -16,27 +16,32 @@ import { mergeFiles } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
 
-// Normalize API-shaped product data to ProductRow for DataTable
+const DEFAULT_COLUMNS = ['id', 'title', 'variant', 'metaSpend', 'totalSpend', 'revenue', 'roi', 'itemsSold', 'ctr', 'cpm'];
+
 function normalizeProducts(products: any[]): any[] {
   return products.map(p => ({
-    id:         p['Product ID']      ?? p.id         ?? p.product_id        ?? '',
-    title:      p['Product Title']   ?? p.title      ?? p.product_title     ?? '',
-    variant:    p['Variant Title']   ?? p.variant    ?? p.variant_title     ?? '',
-    metaSpend:  p['Meta Spend']      ?? p.metaSpend  ?? p.meta_spend        ?? 0,
-    googleCost: p['Google Cost']     ?? p.googleCost ?? p.google_cost       ?? 0,
-    totalSpend: p['Total Spend']     ?? p.totalSpend ?? p.total_spend       ?? 0,
-    revenue:    p['Shopify Revenue'] ?? p.revenue    ?? p.shopify_revenue   ?? 0,
-    roi:        p['ROI']             ?? p.roi        ?? ((() => { const sp = p['Total Spend'] ?? p.totalSpend ?? 0; return sp > 0 ? (p['Shopify Revenue'] ?? p.revenue ?? 0) / sp : 0; })()),
-    itemsSold:  p['Net Items Sold']  ?? p.itemsSold  ?? p.net_items_sold    ?? 0,
-    ctr:        p['CTR']             ?? p.ctr        ?? 0,
-    cpm:        p['CPM']             ?? p.cpm        ?? 0,
+    id:         p['Product ID']      ?? p.id          ?? '',
+    title:      p['Product Title']   ?? p.title        ?? '',
+    variant:    p['Variant Title']   ?? p.variant      ?? '',
+    metaSpend:  Number(p['Meta Spend']      ?? p.metaSpend   ?? 0),
+    googleCost: Number(p['Google Cost']     ?? p.googleCost  ?? 0),
+    totalSpend: Number(p['Total Spend']     ?? p.totalSpend  ?? 0),
+    revenue:    Number(p['Shopify Revenue'] ?? p.revenue     ?? 0),
+    roi:        Number(p['ROI']             ?? p.roi         ?? (() => {
+      const sp  = Number(p['Total Spend']     ?? p.totalSpend  ?? 0);
+      const rev = Number(p['Shopify Revenue'] ?? p.revenue     ?? 0);
+      return sp > 0 ? rev / sp : 0;
+    })()),
+    itemsSold:  Number(p['Net Items Sold']  ?? p.itemsSold   ?? 0),
+    ctr:        Number(p['CTR']             ?? p.ctr         ?? 0),
+    cpm:        Number(p['CPM']             ?? p.cpm         ?? 0),
   }));
 }
 
 function applyFilters(products: any[], filters: ActiveFilter[]): any[] {
   if (!filters.length) return products;
-  return products.filter(p => {
-    return filters.every(f => {
+  return products.filter(p =>
+    filters.every(f => {
       const val = Number(p[f.metric] ?? 0);
       switch (f.operator) {
         case '>':       return val >  f.value;
@@ -47,21 +52,19 @@ function applyFilters(products: any[], filters: ActiveFilter[]): any[] {
         case 'between': return val >= f.value && (f.value2 === undefined || val <= f.value2);
         default:        return true;
       }
-    });
-  });
+    })
+  );
 }
 
 export default function ProductAnalysisPage() {
-  const {
-    metaFile, shopifyFile, googleFile,
-    mergedData, mergedSummary, warnings,
-    setMergedResult,
-  } = useApp();
+  const { metaFile, shopifyFile, googleFile, mergedData, mergedSummary, warnings, setMergedResult } = useApp();
 
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
-  const [runId, setRunId]       = useState<string | null>(null);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState<string | null>(null);
+  const [runId, setRunId]             = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<ActiveFilter[]>([]);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_COLUMNS);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const metaF  = metaFile?.file   ?? null;
   const shopF  = shopifyFile?.file ?? null;
@@ -77,54 +80,59 @@ export default function ProductAnalysisPage() {
     setError(null);
     try {
       const result = await mergeFiles(metaF, shopF, gooF);
-      const products  = result.products  ?? result.data ?? [];
-      const summary   = result.summary   ?? {};
-      const warns     = result.warnings  ?? [];
-      const hasMonth  = result.has_month  ?? false;
-      const hasGoogle = result.has_google ?? (gooF !== null);
-      const mergedSummary = {
+      const products  = result.products ?? result.data ?? [];
+      const summary   = result.summary  ?? {};
+      const warns     = result.warnings ?? [];
+
+      // Compute totals directly from products as fallback when summary fields are 0/missing
+      const calcTotalSpend   = products.reduce((s: number, p: any) => s + Number(p['Total Spend']     ?? p.totalSpend  ?? 0), 0);
+      const calcTotalRev     = products.reduce((s: number, p: any) => s + Number(p['Shopify Revenue'] ?? p.revenue     ?? 0), 0);
+      const calcMetaSpend    = products.reduce((s: number, p: any) => s + Number(p['Meta Spend']      ?? p.metaSpend   ?? 0), 0);
+      const calcGoogleCost   = products.reduce((s: number, p: any) => s + Number(p['Google Cost']     ?? p.googleCost  ?? 0), 0);
+
+      const mergedSummaryObj = {
         products:    summary.products    ?? products.length,
-        total_spend: summary.total_spend ?? summary.totalSpend ?? 0,
-        total_rev:   summary.total_rev   ?? summary.totalRevenue ?? 0,
-        roi:         summary.roi         ?? summary.overall_roi ?? 0,
-        meta_spend:  summary.meta_spend  ?? summary.metaSpend ?? 0,
-        google_cost: summary.google_cost ?? summary.googleCost ?? 0,
+        total_spend: summary.total_spend || calcTotalSpend,
+        total_rev:   summary.total_rev   || calcTotalRev,
+        roi:         summary.roi         || (calcTotalSpend > 0 ? calcTotalRev / calcTotalSpend : 0),
+        meta_spend:  summary.meta_spend  || calcMetaSpend,
+        google_cost: summary.google_cost || calcGoogleCost,
         lpv:         summary.lpv         ?? 0,
       };
-      setMergedResult(products, mergedSummary, hasMonth, hasGoogle, warns);
-      const now = new Date();
-      const ts = `pa_${now.getFullYear()}_${String(now.getMonth()+1).padStart(2,'0')}_${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}_${String(now.getMinutes()).padStart(2,'0')}`;
-      setRunId(ts);
+
+      setMergedResult(products, mergedSummaryObj, result.has_month ?? false, result.has_google ?? (gooF !== null), warns);
+      const n = new Date();
+      setRunId(`pa_${n.getFullYear()}_${String(n.getMonth()+1).padStart(2,'0')}_${String(n.getDate()).padStart(2,'0')}_${String(n.getHours()).padStart(2,'0')}_${String(n.getMinutes()).padStart(2,'0')}`);
     } catch (err: any) {
-      setError(err?.message ?? 'Failed to merge files. Check that your files match the expected format.');
+      setError(err?.message ?? 'Failed to merge files.');
     } finally {
       setLoading(false);
     }
   }, [readyToMerge, metaF, shopF, gooF, setMergedResult]);
 
   const s = mergedSummary;
-  const kpiCards = s
-    ? [
-        { label: 'PRODUCTS',    value: s.products,            format: 'number'   as const },
-        { label: 'META SPEND',  value: s.meta_spend ?? 0,     format: 'currency' as const },
-        { label: 'GOOGLE COST', value: s.google_cost ?? 0,    format: 'currency' as const },
-        { label: 'TOTAL SPEND', value: s.total_spend,         format: 'currency' as const },
-        { label: 'REVENUE',     value: s.total_rev,           format: 'currency' as const },
-        { label: 'OVERALL ROI', value: s.roi,                 format: 'roi'      as const },
-      ]
-    : [];
+  const kpiCards = s ? [
+    { label: 'PRODUCTS',    value: s.products,            format: 'number'   as const },
+    { label: 'META SPEND',  value: s.meta_spend  ?? 0,    format: 'currency' as const },
+    { label: 'GOOGLE COST', value: s.google_cost ?? 0,    format: 'currency' as const },
+    { label: 'TOTAL SPEND', value: s.total_spend,         format: 'currency' as const },
+    { label: 'REVENUE',     value: s.total_rev,           format: 'currency' as const },
+    { label: 'OVERALL ROI', value: s.roi,                 format: 'roi'      as const },
+  ] : [];
 
-  // Normalize all merged data
   const normalizedAll = useMemo(
     () => mergedData ? normalizeProducts(mergedData) : [],
     [mergedData]
   );
 
-  // Apply active filters for display in table and download
   const filteredProducts = useMemo(
     () => applyFilters(normalizedAll, activeFilters),
     [normalizedAll, activeFilters]
   );
+
+  const handleColumnsChange = (cols: string[]) => {
+    setVisibleColumns(cols);
+  };
 
   const breadcrumbs = [
     { label: 'Workspace' },
@@ -150,22 +158,15 @@ export default function ProductAnalysisPage() {
       <div className="mt-4 bg-white rounded-xl border border-[#EEECE5] px-5 py-3.5 flex items-center justify-between">
         <p className="text-sm text-[#57544E]">
           {readyToMerge
-            ? <>Ready to merge — <span className="font-medium text-[#1A1814]">{fileCount} file{fileCount !== 1 ? 's' : ''}</span> loaded</>
+            ? <><span className="font-medium text-[#1A1814]">{fileCount} file{fileCount !== 1 ? 's' : ''}</span> loaded — ready to merge</>
             : 'Upload Meta Ads and Shopify exports to enable merge. Google Ads is optional.'}
         </p>
         <Button
           onClick={handleMerge}
           disabled={!readyToMerge || loading}
-          className={cn(
-            'bg-[#4F46E5] hover:bg-[#4338CA] min-w-[160px]',
-            (!readyToMerge || loading) && 'opacity-60 cursor-not-allowed'
-          )}
+          className={cn('bg-[#4F46E5] hover:bg-[#4338CA] min-w-[160px]', (!readyToMerge || loading) && 'opacity-60 cursor-not-allowed')}
         >
-          {loading ? (
-            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</>
-          ) : (
-            '▶  Merge & Analyse'
-          )}
+          {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</> : '▶  Merge & Analyse'}
         </Button>
       </div>
 
@@ -183,9 +184,7 @@ export default function ProductAnalysisPage() {
       {warnings.length > 0 && isMerged && (
         <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3">
           <p className="text-xs font-medium text-amber-800 mb-1">Warnings</p>
-          {warnings.map((w, i) => (
-            <p key={i} className="text-xs text-amber-700">• {w}</p>
-          ))}
+          {warnings.map((w, i) => <p key={i} className="text-xs text-amber-700">• {w}</p>)}
         </div>
       )}
 
@@ -198,19 +197,27 @@ export default function ProductAnalysisPage() {
                 Data merged · <span className="font-semibold">{s.products} products</span> · {fileCount} sources
               </span>
             </div>
-            {runId && <span className="text-sm text-[#57544E] font-mono text-xs">{runId}</span>}
+            {runId && <span className="font-mono text-xs text-[#57544E]">{runId}</span>}
           </div>
 
-          <KpiStrip cards={kpiCards} />
+          {/* KPI Strip */}
+          {kpiCards.length > 0 && <KpiStrip cards={kpiCards} />}
 
-          <TopPerformers />
+          {/* Top Performers — passes tableRef for scroll-to */}
+          <TopPerformers tableRef={tableRef} />
 
-          <ColumnsAndFilters onFiltersChange={setActiveFilters} />
+          {/* Columns & Filters */}
+          <ColumnsAndFilters
+            onFiltersChange={setActiveFilters}
+            onColumnsChange={handleColumnsChange}
+          />
 
-          {/* Active filter indicator */}
+          {/* Active filter summary */}
           {activeFilters.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-[#8B8780]">Showing {filteredProducts.length} of {normalizedAll.length} products after filters:</span>
+              <span className="text-xs text-[#8B8780]">
+                Showing {filteredProducts.length} of {normalizedAll.length} products after filters:
+              </span>
               {activeFilters.map((f, i) => (
                 <span key={i} className="text-xs bg-[#EEEDFB] text-[#4F46E5] px-2 py-0.5 rounded font-mono">
                   {f.metric} {f.operator} {f.value}{f.value2 !== undefined ? `–${f.value2}` : ''}
@@ -219,6 +226,7 @@ export default function ProductAnalysisPage() {
             </div>
           )}
 
+          {/* Data Table */}
           <div className="bg-white rounded-xl border border-[#EEECE5] overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b border-[#EEECE5]">
               <span className="text-sm text-[#57544E]">
@@ -228,7 +236,9 @@ export default function ProductAnalysisPage() {
                 Rows per page: 50 · Page 1 of {Math.max(1, Math.ceil(filteredProducts.length / 50))}
               </span>
             </div>
-            <DataTable products={filteredProducts} />
+            <div ref={tableRef}>
+              <DataTable products={filteredProducts} columns={visibleColumns} />
+            </div>
           </div>
 
           <DownloadBand products={filteredProducts} activeFilters={activeFilters} />

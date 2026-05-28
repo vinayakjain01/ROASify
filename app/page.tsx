@@ -53,23 +53,38 @@ export default function QuadrantViewPage() {
     { label: '4C Framework' },
   ];
 
-  const panel = (
-    <QuadrantPanel
-      spendThreshold={spendThreshold}
-      revenueThreshold={revenueThreshold}
+  const avgSpend =
+  products.length > 0
+    ? totalSpend / products.length
+    : 0;
 
-      spendPct={spendPct}
-      revPct={revPct}
+const avgRevenue =
+  products.length > 0
+    ? totalRevenue / products.length
+    : 0;
 
-      onSpendPctChange={setSpendPct}
-      onRevPctChange={setRevPct}
 
-      onReset={() => {
-        setSpendPct(50);
-        setRevPct(50);
-      }}
-    />
-  );
+const panel = (
+  <QuadrantPanel
+    spendThreshold={spendThreshold}
+    revenueThreshold={revenueThreshold}
+
+    spendPct={spendPct}
+    revPct={revPct}
+
+    avgSpend={avgSpend}
+    avgRevenue={avgRevenue}
+
+    onSpendPctChange={setSpendPct}
+    onRevPctChange={setRevPct}
+
+    onReset={() => {
+      setSpendPct(50);
+      setRevPct(50);
+    }}
+  />
+);
+  
 
   return (
     <DashboardLayout

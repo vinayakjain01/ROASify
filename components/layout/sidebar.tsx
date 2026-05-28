@@ -21,13 +21,13 @@ export function Sidebar() {
         <Link href="/" className="flex items-center gap-2.5">
           <div className="relative w-8 h-8 bg-[#4F46E5] rounded-lg flex items-center justify-center flex-shrink-0">
             <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-[#F59E0B] rounded-full" />
-            <span className="text-white text-[10px] font-black tracking-tighter">R</span>
+            {/* <span className="text-white text-[10px] font-black tracking-tighter">R</span> */}
           </div>
           <div>
-            <div className="text-white font-semibold text-[15px] tracking-tight leading-none">
+            <div className="text-white font-semibold text-[23px] tracking-tight leading-none">
               ROAS<span className="text-[#4F46E5]">ify</span>
             </div>
-            <div className="text-[#6B6760] text-[10px] mt-0.5">PPM Analytics</div>
+            {/* <div className="text-[#6B6760] text-[10px] mt-0.5">PPM Analytics</div> */}
           </div>
         </Link>
       </div>

@@ -1,49 +1,52 @@
 'use client';
 
+import { useRef } from 'react';
 import { useApp } from '@/lib/context';
 import type { Product } from '@/lib/context';
-import { inr, roiColor } from '@/lib/formatters';
+import { inr, roi, roiColor } from '@/lib/formatters';
 
 function getRoi(p: Product): number {
-  return p.ROI ?? (p['Shopify Revenue'] && p['Total Spend'] ? p['Shopify Revenue'] / p['Total Spend'] : 0);
+  const r = p.ROI ?? p['ROI'];
+  if (r != null && isFinite(Number(r))) return Number(r);
+  const rev = getRevenue(p);
+  const sp  = getSpend(p);
+  return sp > 0 ? rev / sp : 0;
+}
+function getTitle(p: Product): string    { return p['Product Title']   ?? (p as any).title    ?? 'Unknown'; }
+function getVariant(p: Product): string  { return p['Variant Title']   ?? (p as any).variant  ?? ''; }
+function getRevenue(p: Product): number  { return Number(p['Shopify Revenue'] ?? (p as any).revenue    ?? 0); }
+function getSpend(p: Product): number    { return Number(p['Total Spend']     ?? (p as any).totalSpend  ?? 0); }
+function getItemsSold(p: Product): number{ return Number(p['Net Items Sold']  ?? (p as any).itemsSold   ?? 0); }
+
+interface TopPerformersProps {
+  tableRef?: React.RefObject<HTMLDivElement>;
 }
 
-function getTitle(p: Product): string {
-  return p['Product Title'] ?? (p as any).title ?? 'Unknown';
-}
-
-function getVariant(p: Product): string {
-  return p['Variant Title'] ?? (p as any).variant ?? '';
-}
-
-function getRevenue(p: Product): number {
-  return p['Shopify Revenue'] ?? (p as any).revenue ?? 0;
-}
-
-function getSpend(p: Product): number {
-  return p['Total Spend'] ?? (p as any).totalSpend ?? 0;
-}
-
-function getItemsSold(p: Product): number {
-  return p['Net Items Sold'] ?? (p as any).itemsSold ?? 0;
-}
-
-function roiNum(p: Product): number {
-  return getRoi(p);
-}
-
-export function TopPerformers() {
-  const { mergedData, mergedSummary } = useApp();
+export function TopPerformers({ tableRef }: TopPerformersProps) {
+  const { mergedData } = useApp();
 
   if (!mergedData || mergedData.length === 0) return null;
 
-  // Top 3 by ROI, require meaningful volume (items sold > 0)
+  // Top 3 by ROI — allow all products (not just items > 0) to handle 0-revenue edge cases
   const sorted = [...mergedData]
-    .filter(p => getItemsSold(p) > 0)
-    .sort((a, b) => roiNum(b) - roiNum(a))
+    .sort((a, b) => getRoi(b) - getRoi(a))
     .slice(0, 3);
 
   if (sorted.length === 0) return null;
+
+  const handleClick = (productId: string) => {
+    if (!tableRef?.current) return;
+    // Find the row in the table by data-product-id attribute
+    const row = tableRef.current.querySelector(`[data-product-id="${CSS.escape(productId)}"]`);
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      (row as HTMLElement).classList.add('bg-indigo-50');
+      setTimeout(() => (row as HTMLElement).classList.remove('bg-indigo-50'), 2000);
+    } else {
+      // Fallback: scroll table into view
+      tableRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   return (
     <div className="bg-white rounded-[10px] border border-[#EEECE5] p-5">
@@ -66,19 +69,21 @@ export function TopPerformers() {
           const spend   = getSpend(product);
           const revenue = getRevenue(product);
           const units   = getItemsSold(product);
-          const r       = roiNum(product);
+          const r       = getRoi(product);
+          const pid     = product['Product ID'] ?? (product as any).id ?? String(index);
 
           return (
             <div
-              key={product['Product ID'] ?? index}
+              key={pid}
+              onClick={() => handleClick(pid)}
               className="flex-shrink-0 w-80 p-4 bg-[#FAFAF8] rounded-lg border border-[#EEECE5] hover:border-[#4F46E5] transition-colors cursor-pointer"
             >
               <div className="flex items-start justify-between mb-2">
-                <div className="font-medium text-[#1A1814]">
+                <div className="font-medium text-[#1A1814] text-sm leading-snug flex-1 pr-2">
                   {title}{variant ? ` — ${variant}` : ''}
                 </div>
-                <div className="text-lg font-semibold text-[#10B981] tabular-nums">
-                  {roiColor(r)}
+                <div className={`text-lg font-semibold tabular-nums flex-shrink-0 ${roiColor(r)}`}>
+                  {roi(r)}
                 </div>
               </div>
               <div className="text-sm text-[#8B8780] mb-3">
@@ -86,10 +91,10 @@ export function TopPerformers() {
               </div>
               <p className="text-sm text-[#57544E] line-clamp-2">
                 {index === 0
-                  ? `${title} returns ${roiColor(r)} per rupee spent — the highest ROI in this dataset with meaningful volume.`
+                  ? `${title} returns ${roi(r)} per rupee spent — the highest ROI in this dataset.`
                   : index === 1
-                  ? `${title} delivers exceptional efficiency at ${roiColor(r)} ROI while moving ${units.toLocaleString()} units.`
-                  : `${title} achieves ${roiColor(r)} ROI with strong unit economics.`}
+                  ? `${title} delivers exceptional efficiency at ${roi(r)} ROI, moving ${units.toLocaleString()} units.`
+                  : `${title} achieves ${roi(r)} ROI with strong unit economics.`}
               </p>
             </div>
           );

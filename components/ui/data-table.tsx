@@ -2,7 +2,7 @@
 
 import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { inr, roi, roiColor } from '@/lib/formatters'
+import { inr, roi, roiColor } from '@/lib/formatters';
 import type { ProductRow } from '@/lib/api';
 
 interface DataTableProps {
@@ -12,46 +12,49 @@ interface DataTableProps {
   className?: string;
 }
 
-// Column width hints: 'shrink' = content-only, 'grow' = flexible, 'fixed-Npx' = fixed
-const columnWidth: Record<string, string> = {
-  id:         'w-[120px] min-w-[80px]',
-  title:      'min-w-[160px] max-w-[240px]',
-  variant:    'w-[80px] min-w-[60px]',
-  metaSpend:  'w-[110px]',
-  googleCost: 'w-[110px]',
-  totalSpend: 'w-[110px]',
-  revenue:    'w-[110px]',
-  roi:        'w-[70px]',
-  itemsSold:  'w-[90px]',
-  ctr:        'w-[60px]',
-  cpm:        'w-[70px]',
-  category:   'w-[100px]',
-  quadrant:   'w-[100px]',
-  discounted: 'w-[110px]',
+const columnLabels: Record<string, string> = {
+  id:         'Product ID',
+  title:      'Product Title',
+  variant:    'Variant',
+  metaSpend:  'Meta Spend',
+  googleCost: 'Google Cost',
+  totalSpend: 'Total Spend',
+  revenue:    'Revenue',
+  roi:        'ROI',
+  itemsSold:  'Items Sold',
+  ctr:        'CTR',
+  cpm:        'CPM',
+  category:   'Category',
+  quadrant:   'Quadrant',
+  discounted: 'Strategy',
 };
 
-export function DataTable({ 
-  products, 
-  columns = ['id', 'title', 'variant', 'metaSpend', 'totalSpend', 'revenue', 'roi', 'itemsSold', 'ctr', 'cpm'],
+// px widths for table-fixed layout
+const columnPx: Record<string, number> = {
+  id:         130,
+  title:      200,
+  variant:    80,
+  metaSpend:  110,
+  googleCost: 110,
+  totalSpend: 110,
+  revenue:    110,
+  roi:        70,
+  itemsSold:  90,
+  ctr:        60,
+  cpm:        70,
+  category:   100,
+  quadrant:   100,
+  discounted: 110,
+};
+
+const DEFAULT_COLUMNS = ['id', 'title', 'variant', 'metaSpend', 'totalSpend', 'revenue', 'roi', 'itemsSold', 'ctr', 'cpm'];
+
+export function DataTable({
+  products,
+  columns = DEFAULT_COLUMNS,
   maxHeight = '560px',
-  className 
+  className,
 }: DataTableProps) {
-  const columnLabels: Record<string, string> = {
-    id: 'Product ID',
-    title: 'Product Title',
-    variant: 'Variant',
-    metaSpend: 'Meta Spend',
-    googleCost: 'Google Cost',
-    totalSpend: 'Total Spend',
-    revenue: 'Revenue',
-    roi: 'ROI',
-    itemsSold: 'Items Sold',
-    ctr: 'CTR',
-    cpm: 'CPM',
-    category: 'Category',
-    quadrant: 'Quadrant',
-    discounted: 'Strategy'
-  };
 
   const formatCell = (product: ProductRow, column: string): ReactNode => {
     const value = product[column as keyof ProductRow];
@@ -59,113 +62,78 @@ export function DataTable({
     switch (column) {
       case 'id':
         return (
-          <span className="font-mono text-[12px] text-[#8B8780] truncate block max-w-[120px]" title={String(value || '')}>
-            {String(value || '')}
+          <span className="font-mono text-[12px] text-[#8B8780] truncate block" title={String(value ?? '')}>
+            {String(value ?? '')}
           </span>
         );
-
       case 'title':
         return (
-          <span className="font-medium truncate block max-w-[240px]" title={String(value || '')}>
-            {String(value || '')}
+          <span className="font-medium truncate block" title={String(value ?? '')}>
+            {String(value ?? '')}
           </span>
         );
-
       case 'variant':
         return (
-          <span className="truncate block max-w-[80px]" title={String(value || '')}>
-            {String(value || '')}
+          <span className="truncate block" title={String(value ?? '')}>
+            {String(value ?? '')}
           </span>
         );
-
       case 'metaSpend':
       case 'googleCost':
       case 'totalSpend':
       case 'revenue':
-        return (
-          <span className="tabular-nums">
-            {inr(Number(value || 0))}
-          </span>
-        );
-
+        return <span className="tabular-nums">{inr(Number(value ?? 0))}</span>;
       case 'roi':
         return (
-          <span className={cn("tabular-nums font-medium", roiColor(Number(value || 0)))}>
-            {roi(Number(value || 0))}
+          <span className={cn('tabular-nums font-medium', roiColor(Number(value ?? 0)))}>
+            {roi(Number(value ?? 0))}
           </span>
         );
-
       case 'itemsSold':
-        return (
-          <span className="tabular-nums">
-            {Number(value || 0).toLocaleString('en-IN')}
-          </span>
-        );
-
+        return <span className="tabular-nums">{Number(value ?? 0).toLocaleString('en-IN')}</span>;
       case 'ctr':
-        return (
-          <span className="tabular-nums">
-            {Number(value || 0).toFixed(1)}%
-          </span>
-        );
-
+        return <span className="tabular-nums">{Number(value ?? 0).toFixed(1)}%</span>;
       case 'cpm':
-        return (
-          <span className="tabular-nums">
-            ₹{Number(value || 0)}
-          </span>
-        );
-
-      case 'category':
-        return String(value || '');
-
+        return <span className="tabular-nums">₹{Number(value ?? 0)}</span>;
       case 'quadrant':
-        return <QuadrantTag quadrant={String(value || 'cruisers')} />;
-
+        return <QuadrantTag quadrant={String(value ?? 'cruisers')} />;
       case 'discounted':
         return Boolean(value) ? (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#FEF3CD] text-[#B45309]">
-            Discounted
-          </span>
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#FEF3CD] text-[#B45309]">Discounted</span>
         ) : (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#EEEDFB] text-[#4F46E5]">
-            Non-discount
-          </span>
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#EEEDFB] text-[#4F46E5]">Non-discount</span>
         );
-
       default:
-        return String(value || '');
+        return String(value ?? '');
     }
   };
 
   return (
-    <div className={cn("bg-white rounded-[10px] border border-[#EEECE5] overflow-hidden", className)}>
+    <div className={cn('bg-white rounded-[10px] border border-[#EEECE5] overflow-hidden', className)}>
       <div className="overflow-auto" style={{ maxHeight }}>
-        <table className="w-full table-fixed">
+        <table className="w-full" style={{ tableLayout: 'fixed', minWidth: columns.reduce((s, c) => s + (columnPx[c] ?? 100), 0) }}>
           <colgroup>
-            {columns.map((col) => (
-              <col key={col} className={columnWidth[col] || 'w-[100px]'} />
+            {columns.map(col => (
+              <col key={col} style={{ width: columnPx[col] ?? 100 }} />
             ))}
           </colgroup>
           <thead className="sticky top-0 bg-[#F2F0EA] z-10">
             <tr>
-              {columns.map((col) => (
-                <th 
-                  key={col}
-                  className="px-3 py-3 text-left text-[11px] font-medium text-[#8B8780] uppercase tracking-wider whitespace-nowrap overflow-hidden"
-                >
-                  {columnLabels[col] || col}
+              {columns.map(col => (
+                <th key={col} className="px-3 py-3 text-left text-[11px] font-medium text-[#8B8780] uppercase tracking-wider whitespace-nowrap overflow-hidden text-ellipsis">
+                  {columnLabels[col] ?? col}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-[#EEECE5]">
-            {products.map((product) => (
-              <tr 
-                key={String(product.id || Math.random())}
+            {products.map(product => (
+              <tr
+                key={String(product.id ?? Math.random())}
+                data-product-id={String(product.id ?? '')}
                 className="hover:bg-[#F2F0EA] transition-colors duration-75"
               >
-                {columns.map((col) => (
+                {columns.map(col => (
                   <td key={col} className="px-3 py-2.5 text-sm text-[#1A1814] overflow-hidden">
                     {formatCell(product, col)}
                   </td>
@@ -186,11 +154,9 @@ function QuadrantTag({ quadrant }: { quadrant: string }) {
     cruisers:   { bg: 'bg-[#F2F0EC]', text: 'text-[#78716C]', label: 'Cruiser'   },
     casualties: { bg: 'bg-[#FDECEC]', text: 'text-[#EF4444]', label: 'Casualty'  },
   };
-  
-  const style = styles[quadrant] || styles.cruisers;
-  
+  const style = styles[quadrant] ?? styles.cruisers;
   return (
-    <span className={cn("inline-flex items-center px-2 py-0.5 rounded text-xs font-medium", style.bg, style.text)}>
+    <span className={cn('inline-flex items-center px-2 py-0.5 rounded text-xs font-medium', style.bg, style.text)}>
       {style.label}
     </span>
   );

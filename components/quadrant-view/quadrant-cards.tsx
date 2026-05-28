@@ -11,16 +11,17 @@ import type { ProductRow } from '@/lib/api';
 
 type QuadrantKey = 'champions' | 'contenders' | 'cruisers' | 'casualties';
 
-function getSpend(p: Product): number   { return p['Total Spend']    ?? (p as any).totalSpend ?? 0; }
-function getRevenue(p: Product): number { return p['Shopify Revenue'] ?? (p as any).revenue    ?? 0; }
+function n(v: any): number { return Number(v ?? 0); }
+function getSpend(p: Product): number   { return n(p['Total Spend']    ?? (p as any).totalSpend); }
+function getRevenue(p: Product): number { return n(p['Shopify Revenue'] ?? (p as any).revenue);   }
 function getRoi(p: Product): number     { const sp = getSpend(p); return sp > 0 ? getRevenue(p) / sp : 0; }
 
-function classifyProduct(p: Product, spendThreshold: number, revenueThreshold: number): QuadrantKey {
-  const highRevenue = getRevenue(p) >= revenueThreshold;
-  const highSpend   = getSpend(p)   >= spendThreshold;
-  if  (highRevenue && !highSpend) return 'champions';
-  if  (highRevenue &&  highSpend) return 'contenders';
-  if (!highRevenue && !highSpend) return 'cruisers';
+function classifyProduct(p: Product, spendT: number, revT: number): QuadrantKey {
+  const hr = getRevenue(p) >= revT;
+  const hs = getSpend(p)   >= spendT;
+  if  (hr && !hs) return 'champions';
+  if  (hr &&  hs) return 'contenders';
+  if (!hr && !hs) return 'cruisers';
   return 'casualties';
 }
 
@@ -32,34 +33,32 @@ const quadrantConfig: Record<QuadrantKey, { icon: any; label: string; tag: strin
 };
 
 function downloadQuadrantCSV(quadrant: QuadrantKey, products: Product[]) {
-  const rows: string[][] = [];
-  rows.push([`ROASify — ${quadrantConfig[quadrant].label} Quadrant Export`]);
-  rows.push(['Generated', new Date().toLocaleString('en-IN')]);
-  rows.push(['Products', String(products.length)]);
-  rows.push([]);
-  rows.push(['Product ID', 'Product Title', 'Variant', 'Total Spend', 'Revenue', 'ROI', 'Items Sold', 'CTR', 'CPM']);
-  for (const p of products) {
-    rows.push([
-      String(p['Product ID']      ?? (p as any).id       ?? ''),
-      String(p['Product Title']   ?? (p as any).title    ?? ''),
-      String(p['Variant Title']   ?? (p as any).variant  ?? ''),
-      String(getSpend(p)),
-      String(getRevenue(p)),
-      String(getRoi(p).toFixed(2)),
-      String(p['Net Items Sold']  ?? (p as any).itemsSold ?? 0),
-      String(p['CTR']             ?? (p as any).ctr       ?? 0),
-      String(p['CPM']             ?? (p as any).cpm       ?? 0),
-    ]);
-  }
-  const csv = rows
-    .map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
-    .join('\n');
+  const rows: string[][] = [
+    [`ROASify — ${quadrantConfig[quadrant].label} Export`],
+    ['Generated', new Date().toLocaleString('en-IN')],
+    ['Products in quadrant', String(products.length)],
+    [],
+    ['Product ID', 'Product Title', 'Variant', 'Total Spend', 'Revenue', 'ROI', 'Items Sold', 'CTR', 'CPM'],
+    ...products.map(p => {
+      const sp = getSpend(p); const rev = getRevenue(p);
+      return [
+        String(p['Product ID']     ?? (p as any).id       ?? ''),
+        String(p['Product Title']  ?? (p as any).title    ?? ''),
+        String(p['Variant Title']  ?? (p as any).variant  ?? ''),
+        String(sp),
+        String(rev),
+        String(sp > 0 ? (rev / sp).toFixed(2) : '0'),
+        String(p['Net Items Sold'] ?? (p as any).itemsSold ?? 0),
+        String(p['CTR']            ?? (p as any).ctr       ?? 0),
+        String(p['CPM']            ?? (p as any).cpm       ?? 0),
+      ];
+    }),
+  ];
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `roasify_${quadrant}_${Date.now()}.csv`;
-  a.click();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `roasify_${quadrant}.csv`; a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -72,30 +71,29 @@ function QuadrantCard({ quadrant, products }: QuadrantCardProps) {
   const [expanded, setExpanded] = useState(false);
   const config = quadrantConfig[quadrant];
   const colors = getQuadrantColor(quadrant);
-  const Icon = config.icon;
+  const Icon   = config.icon;
 
-  const spend   = products.reduce((s, p) => s + getSpend(p), 0);
+  const spend   = products.reduce((s, p) => s + getSpend(p),   0);
   const revenue = products.reduce((s, p) => s + getRevenue(p), 0);
   const roiVal  = spend > 0 ? revenue / spend : 0;
 
   const rows: ProductRow[] = products.map(p => ({
-    id:         p['Product ID']      ?? (p as any).id,
-    title:      p['Product Title']   ?? (p as any).title,
-    variant:    p['Variant Title']   ?? (p as any).variant,
-    metaSpend:  p['Meta Spend']      ?? (p as any).metaSpend ?? 0,
-    googleCost: p['Google Cost']     ?? (p as any).googleCost ?? 0,
+    id:         p['Product ID']     ?? (p as any).id,
+    title:      p['Product Title']  ?? (p as any).title,
+    variant:    p['Variant Title']  ?? (p as any).variant,
+    metaSpend:  n(p['Meta Spend']   ?? (p as any).metaSpend),
+    googleCost: n(p['Google Cost']  ?? (p as any).googleCost),
     totalSpend: getSpend(p),
     revenue:    getRevenue(p),
     roi:        getRoi(p),
-    itemsSold:  p['Net Items Sold']  ?? (p as any).itemsSold ?? 0,
-    ctr:        p['CTR']             ?? (p as any).ctr ?? 0,
-    cpm:        p['CPM']             ?? (p as any).cpm ?? 0,
+    itemsSold:  n(p['Net Items Sold'] ?? (p as any).itemsSold),
+    ctr:        n(p['CTR']            ?? (p as any).ctr),
+    cpm:        n(p['CPM']            ?? (p as any).cpm),
   }));
 
   return (
     <div className={cn(
-      "bg-white rounded-[10px] border border-[#EEECE5] overflow-hidden",
-      "border-l-[3px]",
+      "bg-white rounded-[10px] border border-[#EEECE5] overflow-hidden border-l-[3px]",
       colors.border
     )}>
       <div className="p-5">
@@ -112,8 +110,7 @@ function QuadrantCard({ quadrant, products }: QuadrantCardProps) {
               <div className="text-xs text-[#8B8780] mt-0.5">{config.description}</div>
             </div>
           </div>
-
-          {/* Download button per quadrant */}
+          {/* Per-quadrant download */}
           <button
             onClick={() => downloadQuadrantCSV(quadrant, products)}
             disabled={products.length === 0}
@@ -139,9 +136,7 @@ function QuadrantCard({ quadrant, products }: QuadrantCardProps) {
           </div>
           <div>
             <div className="text-xs text-[#8B8780] uppercase tracking-wider">ROI</div>
-            <div className={cn("text-xl font-semibold tabular-nums", roiColor(roiVal))}>
-              {roi(roiVal)}
-            </div>
+            <div className={cn("text-xl font-semibold tabular-nums", roiColor(roiVal))}>{roi(roiVal)}</div>
           </div>
         </div>
 
@@ -175,7 +170,6 @@ export function QuadrantGrid({ spendThreshold, revenueThreshold }: QuadrantGridP
   const byQuadrant: Record<QuadrantKey, Product[]> = {
     champions: [], contenders: [], cruisers: [], casualties: [],
   };
-
   for (const p of products) {
     byQuadrant[classifyProduct(p, spendThreshold, revenueThreshold)].push(p);
   }
