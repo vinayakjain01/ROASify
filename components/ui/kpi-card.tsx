@@ -56,16 +56,25 @@ export function KpiCard({
   const trend = delta ? (delta > 0 ? 'up' : 'down') : 'flat';
 
   return (
-    <div className={cn(
-      "bg-white rounded-[10px] border border-[#EEECE5] p-5 shadow-sm",
-      className
-    )}>
-      <div className="text-[11px] font-medium text-[#8B8780] uppercase tracking-wider mb-1">
+    <div
+  className={cn(
+          "bg-white rounded-[10px] border border-[#EEECE5] shadow-sm",
+          "p-4 min-w-0 overflow-hidden",
+          className
+        )}
+      >
+      <div className="text-[10px] font-medium text-[#8B8780] uppercase tracking-wide mb-0.5">
         {label}
       </div>
-      <div className="flex items-end justify-between gap-2">
+      <div className="min-w-0 flex-1">
         <div>
-          <div className="text-[28px] font-semibold text-[#1A1814] tabular-nums leading-tight">
+          <div
+            className={cn(
+              "font-semibold text-[#1A1814] tabular-nums leading-tight",
+              "text-[16px] xl:text-[18px] 2xl:text-[20px]",
+              "truncate whitespace-nowrap overflow-hidden"
+            )}
+          >
             {formattedValue}
           </div>
           {delta !== undefined && (
@@ -77,7 +86,11 @@ export function KpiCard({
             </div>
           )}
         </div>
-        {showSparkline && <Sparkline trend={trend} />}
+        {showSparkline && (
+        <div className="hidden xl:block flex-shrink-0">
+          <Sparkline trend={trend} />
+        </div>
+      )}
       </div>
     </div>
   );
@@ -90,7 +103,13 @@ interface KpiStripProps {
 
 export function KpiStrip({ cards, className }: KpiStripProps) {
   return (
-    <div className={cn("grid gap-4", className)} style={{ gridTemplateColumns: `repeat(${cards.length}, 1fr)` }}>
+    <div
+      className={cn(
+        "grid gap-4",
+        "grid-cols-6",
+        className
+      )}
+    >
       {cards.map((card, index) => (
         <KpiCard key={index} {...card} />
       ))}

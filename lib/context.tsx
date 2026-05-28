@@ -1,6 +1,10 @@
 "use client";
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import {
+  createContext, useContext, useState, useCallback,
+  useMemo, ReactNode,
+} from "react";
 
+// ── Raw Product shape from API ─────────────────────────────────────────────
 export interface Product {
   "Product ID": string;
   "Product Title": string;
@@ -19,6 +23,24 @@ export interface Product {
   "ROI": number;
 }
 
+// ── Normalised, aggregated product shape ───────────────────────────────────
+export interface NormProduct {
+  id: string;
+  title: string;
+  variant: string;
+  month?: string;       // undefined after aggregation
+  metaSpend: number;
+  googleCost: number;
+  totalSpend: number;
+  revenue: number;
+  roi: number;
+  itemsSold: number;
+  lpv: number;
+  conversions: number;
+  ctr: number;
+  cpm: number;
+}
+
 export interface MergedSummary {
   products: number;
   total_spend: number;
@@ -30,96 +52,198 @@ export interface MergedSummary {
 }
 
 export interface QuadrantData {
-  q1: Product[];
-  q2: Product[];
-  q3: Product[];
-  q4: Product[];
-  all: Product[];
-  monthly: Product[];
-  sp_cut: number;
-  rv_cut: number;
-  avg_sp: number;
-  avg_rv: number;
+  q1: Product[]; q2: Product[]; q3: Product[]; q4: Product[];
+  all: Product[]; monthly: Product[];
+  sp_cut: number; rv_cut: number; avg_sp: number; avg_rv: number;
   total_months: number;
 }
 
-interface StoredFile {
-  file: File;
-  name: string;
-  size: number;
+interface StoredFile { file: File; name: string; size: number; }
+
+// ── Pure helpers ───────────────────────────────────────────────────────────
+function n(v: any): number { return Number(v ?? 0); }
+
+export function normalizeOne(p: any): NormProduct {
+  const metaSpend  = n(p["Meta Spend"]      ?? p.metaSpend);
+  const googleCost = n(p["Google Cost"]     ?? p.googleCost);
+  const totalSpend = n(p["Total Spend"]     ?? p.totalSpend ?? metaSpend + googleCost);
+  const revenue    = n(p["Shopify Revenue"] ?? p.revenue);
+  return {
+    id:          String(p["Product ID"]        ?? p.id           ?? ""),
+    title:       String(p["Product Title"]     ?? p.title        ?? ""),
+    variant:     String(p["Variant Title"]     ?? p.variant      ?? ""),
+    month:       p["Month"]                    ?? p.month        ?? undefined,
+    metaSpend,  googleCost, totalSpend, revenue,
+    roi:         totalSpend > 0 ? revenue / totalSpend : 0,
+    itemsSold:   n(p["Net Items Sold"]         ?? p.itemsSold),
+    lpv:         n(p["Landing Page Views"]     ?? p.lpv),
+    conversions: n(p["Conversions"]            ?? p.conversions),
+    ctr:         n(p["CTR"]                    ?? p.ctr),
+    cpm:         n(p["CPM"]                    ?? p.cpm),
+  };
 }
 
+function aggregateGroup(rows: NormProduct[]): NormProduct {
+  const first    = rows[0];
+  const totMeta  = rows.reduce((s, r) => s + r.metaSpend,  0);
+  const totGoog  = rows.reduce((s, r) => s + r.googleCost, 0);
+  const totSpend = rows.reduce((s, r) => s + r.totalSpend, 0);
+  const totRev   = rows.reduce((s, r) => s + r.revenue,    0);
+  const totItems = rows.reduce((s, r) => s + r.itemsSold,  0);
+  const totLpv   = rows.reduce((s, r) => s + r.lpv,        0);
+  const totConv  = rows.reduce((s, r) => s + r.conversions,0);
+
+  const lpvW  = totLpv  > 0 ? totLpv  : rows.length;
+  const metaW = totMeta > 0 ? totMeta : rows.length;
+  const avgCtr = rows.reduce((s, r) => s + r.ctr * (totLpv  > 0 ? r.lpv       : 1), 0) / lpvW;
+  const avgCpm = rows.reduce((s, r) => s + r.cpm * (totMeta > 0 ? r.metaSpend : 1), 0) / metaW;
+
+  return {
+    id: first.id, title: first.title, variant: first.variant,
+    month: undefined,
+    metaSpend: totMeta, googleCost: totGoog, totalSpend: totSpend,
+    revenue: totRev,
+    roi: totSpend > 0 ? totRev / totSpend : 0,
+    itemsSold: totItems, lpv: totLpv, conversions: totConv,
+    ctr: avgCtr, cpm: avgCpm,
+  };
+}
+
+function groupById(rows: NormProduct[]): NormProduct[] {
+  const map = new Map<string, NormProduct[]>();
+  for (const r of rows) {
+    if (!map.has(r.id)) map.set(r.id, []);
+    map.get(r.id)!.push(r);
+  }
+  return Array.from(map.values()).map(aggregateGroup);
+}
+
+function detectMonths(rows: NormProduct[]): string[] {
+  const set = new Set<string>();
+  for (const r of rows) { if (r.month) set.add(r.month); }
+  return Array.from(set).sort((a, b) => {
+    const da = new Date(a + " 1"), db = new Date(b + " 1");
+    if (!isNaN(da.getTime()) && !isNaN(db.getTime())) return da.getTime() - db.getTime();
+    return a.localeCompare(b);
+  });
+}
+
+// ── Context shape ──────────────────────────────────────────────────────────
 interface AppState {
-  // Stored files (persist across page switches)
-  metaFile:     StoredFile | null;
-  shopifyFile:  StoredFile | null;
-  googleFile:   StoredFile | null;
-  discountFile: StoredFile | null;
-  setMetaFile:     (f: File | null) => void;
-  setShopifyFile:  (f: File | null) => void;
-  setGoogleFile:   (f: File | null) => void;
+  metaFile: StoredFile | null; shopifyFile: StoredFile | null;
+  googleFile: StoredFile | null; discountFile: StoredFile | null;
+  setMetaFile: (f: File | null) => void;
+  setShopifyFile: (f: File | null) => void;
+  setGoogleFile: (f: File | null) => void;
   setDiscountFile: (f: File | null) => void;
 
-  // Merged product analysis data
-  mergedData:    Product[] | null;
+  mergedData: Product[] | null;
   mergedSummary: MergedSummary | null;
-  hasMonth:      boolean;
-  hasGoogle:     boolean;
-  warnings:      string[];
-  setMergedResult: (
-    data: Product[],
-    summary: MergedSummary,
-    hm: boolean,
-    hg: boolean,
-    warns: string[]
-  ) => void;
+  hasMonth: boolean; hasGoogle: boolean; warnings: string[];
+  setMergedResult: (data: Product[], summary: MergedSummary, hm: boolean, hg: boolean, warns: string[]) => void;
   clearMergedData: () => void;
 
-  // Quadrant data
+  // ── Global month selection ───────────────────────────────────────────
+  allMonths: string[];
+  selectedMonths: Set<string>;
+  toggleMonth: (m: string) => void;
+  selectAllMonths: () => void;
+
+  // ── Computed: month-filtered + aggregated by product ID ─────────────
+  // This is the SINGLE source of truth for all display components.
+  aggregatedProducts: NormProduct[];
+
   quadrantData: QuadrantData | null;
   setQuadrantData: (d: QuadrantData) => void;
   clearQuadrantData: () => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
+const toStored = (f: File | null): StoredFile | null =>
+  f ? { file: f, name: f.name, size: f.size } : null;
 
-function toStoredFile(f: File | null): StoredFile | null {
-  if (!f) return null;
-  return { file: f, name: f.name, size: f.size };
-}
-
+// ── Provider ───────────────────────────────────────────────────────────────
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [metaFile,      setMetaFileRaw]     = useState<StoredFile | null>(null);
-  const [shopifyFile,   setShopifyFileRaw]  = useState<StoredFile | null>(null);
-  const [googleFile,    setGoogleFileRaw]   = useState<StoredFile | null>(null);
-  const [discountFile,  setDiscountFileRaw] = useState<StoredFile | null>(null);
+  const [metaFile,     setMetaRaw]     = useState<StoredFile | null>(null);
+  const [shopifyFile,  setShopifyRaw]  = useState<StoredFile | null>(null);
+  const [googleFile,   setGoogleRaw]   = useState<StoredFile | null>(null);
+  const [discountFile, setDiscountRaw] = useState<StoredFile | null>(null);
 
-  const [mergedData,    setMergedData]    = useState<Product[] | null>(null);
-  const [mergedSummary, setMergedSummary] = useState<MergedSummary | null>(null);
-  const [hasMonth,      setHasMonth]      = useState(false);
-  const [hasGoogle,     setHasGoogle]     = useState(false);
-  const [warnings,      setWarnings]      = useState<string[]>([]);
-  const [quadrantData,  setQuadrantDataRaw] = useState<QuadrantData | null>(null);
+  const [mergedData,    setMergedDataRaw]    = useState<Product[] | null>(null);
+  const [mergedSummary, setMergedSummaryRaw] = useState<MergedSummary | null>(null);
+  const [hasMonth,   setHasMonth]   = useState(false);
+  const [hasGoogle,  setHasGoogle]  = useState(false);
+  const [warnings,   setWarnings]   = useState<string[]>([]);
+  const [quadrantData, setQRaw]     = useState<QuadrantData | null>(null);
 
-  const setMetaFile     = useCallback((f: File | null) => setMetaFileRaw(toStoredFile(f)), []);
-  const setShopifyFile  = useCallback((f: File | null) => setShopifyFileRaw(toStoredFile(f)), []);
-  const setGoogleFile   = useCallback((f: File | null) => setGoogleFileRaw(toStoredFile(f)), []);
-  const setDiscountFile = useCallback((f: File | null) => setDiscountFileRaw(toStoredFile(f)), []);
+  // ── Month selection — lives here so TopBar and pages share the same state
+  const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
+
+  const setMetaFile     = useCallback((f: File | null) => setMetaRaw(toStored(f)),    []);
+  const setShopifyFile  = useCallback((f: File | null) => setShopifyRaw(toStored(f)), []);
+  const setGoogleFile   = useCallback((f: File | null) => setGoogleRaw(toStored(f)),  []);
+  const setDiscountFile = useCallback((f: File | null) => setDiscountRaw(toStored(f)),[]);
 
   const setMergedResult = useCallback((
     data: Product[], summary: MergedSummary,
     hm: boolean, hg: boolean, warns: string[]
   ) => {
-    setMergedData(data);
-    setMergedSummary(summary);
-    setHasMonth(hm);
-    setHasGoogle(hg);
-    setWarnings(warns);
+    setMergedDataRaw(data);
+    setMergedSummaryRaw(summary);
+    setHasMonth(hm); setHasGoogle(hg); setWarnings(warns);
+    // Auto-select ALL months on fresh data
+    const months = detectMonths(data.map(normalizeOne));
+    setSelectedMonths(new Set(months));
   }, []);
 
-  const clearMergedData   = useCallback(() => { setMergedData(null); setMergedSummary(null); }, []);
-  const setQuadrantData   = useCallback((d: QuadrantData) => setQuadrantDataRaw(d), []);
-  const clearQuadrantData = useCallback(() => setQuadrantDataRaw(null), []);
+  const clearMergedData = useCallback(() => {
+    setMergedDataRaw(null); setMergedSummaryRaw(null);
+    setSelectedMonths(new Set());
+  }, []);
+
+  const setQuadrantData   = useCallback((d: QuadrantData) => setQRaw(d), []);
+  const clearQuadrantData = useCallback(() => setQRaw(null), []);
+
+  // ── Derived: sorted month list ─────────────────────────────────────────
+  const allMonths = useMemo(() => {
+    if (!mergedData) return [];
+    return detectMonths(mergedData.map(normalizeOne));
+  }, [mergedData]);
+
+  // ── Month actions ──────────────────────────────────────────────────────
+  const toggleMonth = useCallback((m: string) => {
+    setSelectedMonths(prev => {
+      const next = new Set(prev);
+      if (next.has(m)) {
+        if (next.size === 1) return prev; // always keep at least one
+        next.delete(m);
+      } else {
+        next.add(m);
+      }
+      return next;
+    });
+  }, []);
+
+  const selectAllMonths = useCallback(() => {
+    setSelectedMonths(new Set(allMonths));
+  }, [allMonths]);
+
+  // ── Derived: aggregatedProducts ────────────────────────────────────────
+  // This is the core computation:
+  //   1. Normalise every raw row
+  //   2. Keep only rows whose month is in selectedMonths
+  //      (if no month column exists, keep all rows)
+  //   3. Group by product ID and SUM numeric fields
+  // Result: one row per product with spend/revenue totalled across selected months.
+  const aggregatedProducts = useMemo((): NormProduct[] => {
+    if (!mergedData || mergedData.length === 0) return [];
+    const norm = mergedData.map(normalizeOne);
+    const hasMonthCol = norm.some(r => r.month);
+    const filtered = hasMonthCol
+      ? norm.filter(r => !r.month || selectedMonths.has(r.month))
+      : norm;
+    return groupById(filtered);
+  }, [mergedData, selectedMonths]);
 
   return (
     <AppContext.Provider value={{
@@ -127,6 +251,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setMetaFile, setShopifyFile, setGoogleFile, setDiscountFile,
       mergedData, mergedSummary, hasMonth, hasGoogle, warnings,
       setMergedResult, clearMergedData,
+      allMonths, selectedMonths, toggleMonth, selectAllMonths,
+      aggregatedProducts,
       quadrantData, setQuadrantData, clearQuadrantData,
     }}>
       {children}

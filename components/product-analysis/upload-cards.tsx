@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useCallback } from 'react';
+import Image from 'next/image';
 import { Upload, Check, X, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/lib/context';
@@ -25,7 +26,7 @@ const sources: SourceConfig[] = [
     id: 'shopify',
     name: 'Shopify',
     required: true,
-    description: 'Product Variant ID · Product Title · Month · Net Sales · Net Items Sold',
+    description: 'Product Variant ID · Product Title · Month · Total Sales · Net Items Sold',
     iconBg: 'bg-[#E7F7E7]',
   },
   {
@@ -38,25 +39,7 @@ const sources: SourceConfig[] = [
 ];
 
 function SourceIcon({ name }: { name: string }) {
-  if (name === 'Meta Ads') return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="10" fill="#1877F2"/>
-      <path d="M15.5 8.5C15.5 8.5 14.5 8 13 8C10.5 8 9 10 9 12C9 14 10.5 16 13 16C14.5 16 15.5 15.5 15.5 15.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-    </svg>
-  );
-  if (name === 'Shopify') return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-      <path d="M17.5 6L12 4L6.5 6V14L12 20L17.5 14V6Z" fill="#96BF48" stroke="#96BF48" strokeWidth="0.5"/>
-      <path d="M12 8V16M9 10L12 8L15 10" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-  return (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-      <circle cx="7" cy="17" r="3" fill="#FBBC04"/>
-      <circle cx="17" cy="7" r="3" fill="#EA4335"/>
-      <rect x="6" y="8" width="12" height="4" rx="2" fill="#4285F4" transform="rotate(30 12 12)"/>
-    </svg>
-  );
+
 }
 
 function formatBytes(bytes: number) {
@@ -90,8 +73,25 @@ function UploadCard({ source, file, onFile }: UploadCardProps) {
     )}>
       <div className="flex items-start justify-between p-4 pb-3">
         <div className="flex items-center gap-3">
-          <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0', source.iconBg)}>
-            <SourceIcon name={source.name} />
+          <div
+            className={cn(
+              'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border border-[#EEECE5] bg-white'
+            )}
+          >
+            <Image
+              src={
+                source.id === 'meta'
+                  ? '/logos/meta.png'
+                  : source.id === 'shopify'
+                  ? '/logos/shopify.png'
+                  : '/logos/google-ads.png'
+              }
+              alt={source.name}
+              width={22}
+              height={22}
+              className="object-contain"
+              style={{ width: 'auto', height: 'auto' }}
+            />
           </div>
           <div>
             <div className="flex items-center gap-2">

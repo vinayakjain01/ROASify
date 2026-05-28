@@ -1,32 +1,26 @@
 'use client';
 
 import { useApp } from '@/lib/context';
-import type { Product } from '@/lib/context';
 import { inr, roi } from '@/lib/formatters';
 import { PanelSection, PanelRow, SourceItem } from '@/components/layout/right-panel';
 
-function n(v: any): number { return Number(v ?? 0); }
-function getSpend(p: Product): number    { return n(p['Total Spend']     ?? (p as any).totalSpend); }
-function getRevenue(p: Product): number  { return n(p['Shopify Revenue'] ?? (p as any).revenue);    }
-function getMeta(p: Product): number     { return n(p['Meta Spend']      ?? (p as any).metaSpend);  }
-function getGoogle(p: Product): number   { return n(p['Google Cost']     ?? (p as any).googleCost); }
-function getItems(p: Product): number    { return n(p['Net Items Sold']  ?? (p as any).itemsSold);  }
-
 export function ProductAnalysisPanel() {
-  const { metaFile, shopifyFile, googleFile, mergedData, mergedSummary } = useApp();
+  const {
+    metaFile, shopifyFile, googleFile,
+    mergedData, aggregatedProducts, allMonths, selectedMonths,
+  } = useApp();
 
-  const products = mergedData ?? [];
+  // Always use aggregatedProducts — it's already month-filtered and per-product
+  const products = aggregatedProducts;
   const count    = products.length;
 
-  // Always compute from raw products — never trust summary zeros
-  const totalSpend   = count > 0 ? products.reduce((s, p) => s + getSpend(p),   0) : (mergedSummary?.total_spend ?? 0);
-  const totalRevenue = count > 0 ? products.reduce((s, p) => s + getRevenue(p), 0) : (mergedSummary?.total_rev   ?? 0);
-  const totalMeta    = count > 0 ? products.reduce((s, p) => s + getMeta(p),    0) : (mergedSummary?.meta_spend  ?? 0);
-  const totalGoogle  = count > 0 ? products.reduce((s, p) => s + getGoogle(p),  0) : (mergedSummary?.google_cost ?? 0);
-  const totalItems   = count > 0 ? products.reduce((s, p) => s + getItems(p),   0) : 0;
+  const totalSpend   = products.reduce((s, p) => s + p.totalSpend, 0);
+  const totalRevenue = products.reduce((s, p) => s + p.revenue,    0);
+  const totalMeta    = products.reduce((s, p) => s + p.metaSpend,  0);
+  const totalGoogle  = products.reduce((s, p) => s + p.googleCost, 0);
+  const totalItems   = products.reduce((s, p) => s + p.itemsSold,  0);
 
-  const overallRoi   = totalSpend > 0 ? totalRevenue / totalSpend : 0;
-
+  const overallRoi = totalSpend > 0 ? totalRevenue / totalSpend : 0;
   const avgSpend   = count > 0 ? totalSpend   / count : 0;
   const avgRevenue = count > 0 ? totalRevenue / count : 0;
   const avgMeta    = count > 0 ? totalMeta    / count : 0;
@@ -34,7 +28,10 @@ export function ProductAnalysisPanel() {
   const avgItems   = count > 0 ? Math.round(totalItems / count) : 0;
 
   const runId = mergedData
-    ? (() => { const n = new Date(); return `pa_${n.getFullYear()}_${String(n.getMonth()+1).padStart(2,'0')}_${String(n.getDate()).padStart(2,'0')}`; })()
+    ? (() => {
+        const n = new Date();
+        return `pa_${n.getFullYear()}_${String(n.getMonth()+1).padStart(2,'0')}_${String(n.getDate()).padStart(2,'0')}`;
+      })()
     : '—';
 
   const files = [
@@ -43,6 +40,12 @@ export function ProductAnalysisPanel() {
     { key: 'google',  label: 'Google Ads', stored: googleFile  },
   ];
 
+  const monthLabel = allMonths.length > 0
+    ? (selectedMonths.size === allMonths.length
+        ? `All ${allMonths.length} months`
+        : `${selectedMonths.size} of ${allMonths.length} months`)
+    : null;
+
   return (
     <div className="p-5 space-y-5">
       <PanelSection title="Run details">
@@ -50,6 +53,7 @@ export function ProductAnalysisPanel() {
           <PanelRow label="Run ID"   value={runId} mono />
           <PanelRow label="Products" value={String(count)} />
           <PanelRow label="Sources"  value={`${files.filter(f => f.stored).length} files`} />
+          {monthLabel && <PanelRow label="Months" value={monthLabel} />}
         </div>
         <div className="mt-4">
           <div className="text-[10px] font-semibold text-[#8B8780] uppercase tracking-widest mb-2">
@@ -67,7 +71,7 @@ export function ProductAnalysisPanel() {
       </PanelSection>
 
       {count > 0 && (
-        <PanelSection title="Averages per product">
+        <PanelSection title={`Averages per product${monthLabel ? ` · ${monthLabel}` : ''}`}>
           <div className="space-y-1">
             <PanelRow label="Avg Meta Spend"    value={inr(avgMeta)}    />
             <PanelRow label="Avg Google Spend"  value={inr(avgGoogle)}  />
@@ -81,8 +85,8 @@ export function ProductAnalysisPanel() {
 
       <PanelSection title="Methodology">
         <p className="text-sm text-[#57544E] leading-relaxed">
-          ROI = Shopify Revenue ÷ (Meta Spend + Google Cost). Merge key is Product ID
-          across sources. Products present in Shopify but absent from ad platforms are tagged Organic.
+          ROI = Shopify Revenue ÷ Total Spend. Averages reflect selected months only.
+          Multi-month data is summed per product ID before averaging.
         </p>
       </PanelSection>
     </div>

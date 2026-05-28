@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Upload, LayoutGrid, Tag, Play } from 'lucide-react';
+import { Upload, LayoutGrid, Tag} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -57,17 +57,6 @@ export function Sidebar() {
           })}
         </ul>
       </nav>
-
-      {/* Bottom — just the CTA button, no user info */}
-      <div className="p-3 border-t border-[#2A2620]">
-        <Link
-          href="/product-analysis"
-          className="w-full flex items-center justify-center gap-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
-        >
-          <Play className="w-3.5 h-3.5" />
-          Run Product Analysis
-        </Link>
-      </div>
     </aside>
   );
 }
