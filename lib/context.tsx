@@ -1,7 +1,7 @@
 "use client";
 import {
   createContext, useContext, useState, useCallback,
-  useMemo, ReactNode,
+  useMemo, useEffect, ReactNode,
 } from "react";
 
 // ── Raw Product shape from API ─────────────────────────────────────────────
@@ -69,10 +69,10 @@ export function normalizeOne(p: any): NormProduct {
   const totalSpend = n(p["Total Spend"]     ?? p.totalSpend ?? metaSpend + googleCost);
   const revenue    = n(p["Shopify Revenue"] ?? p.revenue);
   return {
-    id:          String(p["Product ID"]        ?? p.id           ?? ""),
-    title:       String(p["Product Title"]     ?? p.title        ?? ""),
-    variant:     String(p["Variant Title"]     ?? p.variant      ?? ""),
-    month:       p["Month"]                    ?? p.month        ?? undefined,
+    id:          String(p["Product ID"]        ?? p.id        ?? ""),
+    title:       String(p["Product Title"]     ?? p.title     ?? ""),
+    variant:     String(p["Variant Title"]     ?? p.variant   ?? ""),
+    month:       p["Month"]                    ?? p.month     ?? undefined,
     metaSpend,  googleCost, totalSpend, revenue,
     roi:         totalSpend > 0 ? revenue / totalSpend : 0,
     itemsSold:   n(p["Net Items Sold"]         ?? p.itemsSold),
@@ -83,20 +83,27 @@ export function normalizeOne(p: any): NormProduct {
   };
 }
 
+// FIX 2: single-pass loop instead of 8 separate .reduce() calls
 function aggregateGroup(rows: NormProduct[]): NormProduct {
-  const first    = rows[0];
-  const totMeta  = rows.reduce((s, r) => s + r.metaSpend,  0);
-  const totGoog  = rows.reduce((s, r) => s + r.googleCost, 0);
-  const totSpend = rows.reduce((s, r) => s + r.totalSpend, 0);
-  const totRev   = rows.reduce((s, r) => s + r.revenue,    0);
-  const totItems = rows.reduce((s, r) => s + r.itemsSold,  0);
-  const totLpv   = rows.reduce((s, r) => s + r.lpv,        0);
-  const totConv  = rows.reduce((s, r) => s + r.conversions,0);
+  const first = rows[0];
+  let totMeta = 0, totGoog = 0, totSpend = 0, totRev = 0;
+  let totItems = 0, totLpv = 0, totConv = 0;
+  let ctrAcc = 0, cpmAcc = 0;
+
+  for (const r of rows) {
+    totMeta  += r.metaSpend;
+    totGoog  += r.googleCost;
+    totSpend += r.totalSpend;
+    totRev   += r.revenue;
+    totItems += r.itemsSold;
+    totLpv   += r.lpv;
+    totConv  += r.conversions;
+    ctrAcc   += r.ctr * r.lpv;
+    cpmAcc   += r.cpm * r.metaSpend;
+  }
 
   const lpvW  = totLpv  > 0 ? totLpv  : rows.length;
   const metaW = totMeta > 0 ? totMeta : rows.length;
-  const avgCtr = rows.reduce((s, r) => s + r.ctr * (totLpv  > 0 ? r.lpv       : 1), 0) / lpvW;
-  const avgCpm = rows.reduce((s, r) => s + r.cpm * (totMeta > 0 ? r.metaSpend : 1), 0) / metaW;
 
   return {
     id: first.id, title: first.title, variant: first.variant,
@@ -105,7 +112,8 @@ function aggregateGroup(rows: NormProduct[]): NormProduct {
     revenue: totRev,
     roi: totSpend > 0 ? totRev / totSpend : 0,
     itemsSold: totItems, lpv: totLpv, conversions: totConv,
-    ctr: avgCtr, cpm: avgCpm,
+    ctr: ctrAcc / lpvW,
+    cpm: cpmAcc / metaW,
   };
 }
 
@@ -184,6 +192,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setGoogleFile   = useCallback((f: File | null) => setGoogleRaw(toStored(f)),  []);
   const setDiscountFile = useCallback((f: File | null) => setDiscountRaw(toStored(f)),[]);
 
+  // FIX 1: setMergedResult no longer calls normalizeOne itself.
+  // Month auto-selection is handled by the useEffect below that watches
+  // normalizedProducts, so we avoid a redundant map(normalizeOne) here.
   const setMergedResult = useCallback((
     data: Product[], summary: MergedSummary,
     hm: boolean, hg: boolean, warns: string[]
@@ -191,9 +202,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setMergedDataRaw(data);
     setMergedSummaryRaw(summary);
     setHasMonth(hm); setHasGoogle(hg); setWarnings(warns);
-    // Auto-select ALL months on fresh data
-    const months = detectMonths(data.map(normalizeOne));
-    setSelectedMonths(new Set(months));
+    // selectedMonths will be auto-populated by the useEffect on normalizedProducts
   }, []);
 
   const clearMergedData = useCallback(() => {
@@ -204,11 +213,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setQuadrantData   = useCallback((d: QuadrantData) => setQRaw(d), []);
   const clearQuadrantData = useCallback(() => setQRaw(null), []);
 
-  // ── Derived: sorted month list ─────────────────────────────────────────
-  const allMonths = useMemo(() => {
-    if (!mergedData) return [];
-    return detectMonths(mergedData.map(normalizeOne));
+  // ── FIX 1: Normalize ONCE, only when raw data changes ─────────────────
+  // Previously, normalizeOne ran 3 separate times:
+  //   1. inside setMergedResult (detectMonths call)
+  //   2. inside allMonths useMemo
+  //   3. inside aggregatedProducts useMemo
+  // Now it runs exactly once and both allMonths and aggregatedProducts
+  // derive from this single normalized array.
+  const normalizedProducts = useMemo((): NormProduct[] => {
+    if (!mergedData || mergedData.length === 0) return [];
+    return mergedData.map(normalizeOne);
   }, [mergedData]);
+
+  // ── Auto-select all months whenever normalized data is refreshed ───────
+  // Replaces the detectMonths(data.map(normalizeOne)) call inside setMergedResult.
+  useEffect(() => {
+    if (normalizedProducts.length > 0) {
+      const months = detectMonths(normalizedProducts);
+      setSelectedMonths(new Set(months));
+    }
+  }, [normalizedProducts]);
+
+  // ── Derived: sorted month list — reads from normalizedProducts ─────────
+  const allMonths = useMemo(() => {
+    if (!normalizedProducts.length) return [];
+    return detectMonths(normalizedProducts);
+  }, [normalizedProducts]);
 
   // ── Month actions ──────────────────────────────────────────────────────
   const toggleMonth = useCallback((m: string) => {
@@ -229,21 +259,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [allMonths]);
 
   // ── Derived: aggregatedProducts ────────────────────────────────────────
-  // This is the core computation:
-  //   1. Normalise every raw row
-  //   2. Keep only rows whose month is in selectedMonths
+  // Reads from normalizedProducts (already computed above) — no second
+  // map(normalizeOne) call here.
+  //   1. Keep only rows whose month is in selectedMonths
   //      (if no month column exists, keep all rows)
-  //   3. Group by product ID and SUM numeric fields
+  //   2. Group by product ID and SUM numeric fields via aggregateGroup
+  //      (FIX 2: aggregateGroup now uses a single-pass loop)
   // Result: one row per product with spend/revenue totalled across selected months.
   const aggregatedProducts = useMemo((): NormProduct[] => {
-    if (!mergedData || mergedData.length === 0) return [];
-    const norm = mergedData.map(normalizeOne);
-    const hasMonthCol = norm.some(r => r.month);
+    if (!normalizedProducts.length) return [];
+    const hasMonthCol = normalizedProducts.some(r => r.month);
     const filtered = hasMonthCol
-      ? norm.filter(r => !r.month || selectedMonths.has(r.month))
-      : norm;
+      ? normalizedProducts.filter(r => !r.month || selectedMonths.has(r.month))
+      : normalizedProducts;
     return groupById(filtered);
-  }, [mergedData, selectedMonths]);
+  }, [normalizedProducts, selectedMonths]);
 
   return (
     <AppContext.Provider value={{

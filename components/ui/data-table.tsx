@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useState, useMemo } from 'react';
+import { ReactNode, useState, useMemo, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { inr, roi, roiColor } from '@/lib/formatters';
 import type { ProductRow } from '@/lib/api';
@@ -24,16 +24,18 @@ export function DataTable({
   const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE));
 
   // Reset to page 1 whenever the products array changes (new merge)
-  const pageRows = useMemo(() => {
-    setPage(1);
-    return products;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const prevLengthRef = useRef(products.length);
+  useEffect(() => {
+    if (prevLengthRef.current !== products.length) {
+      prevLengthRef.current = products.length;
+      setPage(1);
+    }
   }, [products.length]);
 
   const visibleRows = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return pageRows.slice(start, start + PAGE_SIZE);
-  }, [pageRows, page]);
+    return products.slice(start, start + PAGE_SIZE);
+  }, [products, page]);
 
   const columnLabels: Record<string, string> = {
     id:         'Product ID',

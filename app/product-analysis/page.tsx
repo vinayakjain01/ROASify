@@ -124,15 +124,20 @@ export default function ProductAnalysisPage() {
   // KPIs derived from aggregatedProducts (always reflects selected months)
   const kpiCards = useMemo(() => {
     if (!aggregatedProducts.length) return [];
-    const totSpend = aggregatedProducts.reduce((a, p) => a + p.totalSpend, 0);
-    const totRev   = aggregatedProducts.reduce((a, p) => a + p.revenue,    0);
+    let totSpend = 0, totRev = 0, totMeta = 0, totGoogle = 0;
+    for (const p of aggregatedProducts) {
+      totSpend  += p.totalSpend;
+      totRev    += p.revenue;
+      totMeta   += p.metaSpend;
+      totGoogle += p.googleCost;
+    }
     return [
-      { label: 'PRODUCTS',    value: aggregatedProducts.length,                                format: 'number'   as const },
-      { label: 'META SPEND',  value: aggregatedProducts.reduce((a, p) => a + p.metaSpend,  0), format: 'currency' as const },
-      { label: 'GOOGLE COST', value: aggregatedProducts.reduce((a, p) => a + p.googleCost, 0), format: 'currency' as const },
-      { label: 'TOTAL SPEND', value: totSpend,                                                  format: 'currency' as const },
-      { label: 'REVENUE',     value: totRev,                                                    format: 'currency' as const },
-      { label: 'OVERALL ROI', value: totSpend > 0 ? totRev / totSpend : 0,                      format: 'roi'      as const },
+      { label: 'PRODUCTS',    value: aggregatedProducts.length, format: 'number'   as const },
+      { label: 'META SPEND',  value: totMeta,                   format: 'currency' as const },
+      { label: 'GOOGLE COST', value: totGoogle,                 format: 'currency' as const },
+      { label: 'TOTAL SPEND', value: totSpend,                  format: 'currency' as const },
+      { label: 'REVENUE',     value: totRev,                    format: 'currency' as const },
+      { label: 'OVERALL ROI', value: totSpend > 0 ? totRev / totSpend : 0, format: 'roi' as const },
     ];
   }, [aggregatedProducts]);
 
