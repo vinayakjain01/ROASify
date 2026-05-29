@@ -10,6 +10,7 @@ import { ColumnsAndFilters } from '@/components/product-analysis/columns-filters
 import type { ActiveFilter } from '@/components/product-analysis/columns-filters';
 import { DownloadBand } from '@/components/product-analysis/download-band';
 import { ProductAnalysisPanel } from '@/components/product-analysis/right-panel';
+import { FilteredTotalsBar } from '@/components/product-analysis/filtered-totals-bar';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/lib/context';
 import type { NormProduct } from '@/lib/context';
@@ -116,12 +117,14 @@ export default function ProductAnalysisPage() {
     );
   }, [aggregatedProducts, searchQuery]);
 
+  // finalProducts is what the DataTable and the totals bar both read from —
+  // it reflects every active filter + search query simultaneously.
   const finalProducts = useMemo(
     () => applyFilters(searchFiltered, activeFilters),
     [searchFiltered, activeFilters]
   );
 
-  // KPIs derived from aggregatedProducts (always reflects selected months)
+  // KPIs derived from aggregatedProducts (always reflects selected months, ignores search/metric filters)
   const kpiCards = useMemo(() => {
     if (!aggregatedProducts.length) return [];
     let totSpend = 0, totRev = 0, totMeta = 0, totGoogle = 0;
@@ -152,7 +155,6 @@ export default function ProductAnalysisPage() {
     { label: 'Product Analysis' },
     { label: 'Overall View' },
   ];
-  const [panelOpen, setPanelOpen] = useState(true);
 
   return (
     <DashboardLayout
@@ -219,7 +221,7 @@ export default function ProductAnalysisPage() {
             {runId && <span className="font-mono text-xs text-[#57544E]">{runId}</span>}
           </div>
 
-          {/* KPIs — live-updated from aggregatedProducts (month-sensitive) */}
+          {/* KPIs — live-updated from aggregatedProducts (month-sensitive, ignores search/filters) */}
           {kpiCards.length > 0 && <KpiStrip cards={kpiCards} />}
 
           {/* Top Performers — month-sensitive, totalSpend > 1 */}
@@ -254,7 +256,13 @@ export default function ProductAnalysisPage() {
             </div>
           </div>
 
-          {/* Data Table — driven by aggregatedProducts (reacts to month change) */}
+          {/* ── TOTALS BAR — updates live with every search/filter change ── */}
+          <FilteredTotalsBar
+            products={finalProducts}
+            totalCount={aggregatedProducts.length}
+          />
+
+          {/* Data Table — driven by finalProducts (reacts to search, filters, month change) */}
           <div ref={tableRef}>
             <DataTable products={finalProducts as any} columns={visibleColumns} />
           </div>
