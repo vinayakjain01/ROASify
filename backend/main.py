@@ -1,6 +1,7 @@
 # backend/main.py
-from fastapi import FastAPI, UploadFile, File, HTTPException # type: ignore
-from fastapi.middleware.cors import CORSMiddleware # type: ignore
+import os
+from fastapi import FastAPI, UploadFile, File, HTTPException  # type: ignore
+from fastapi.middleware.cors import CORSMiddleware            # type: ignore
 import io, json, math
 import pandas as pd
 from data_cleaner import clean_meta, clean_shopify, clean_google
@@ -12,14 +13,19 @@ from analytics import (
 
 app = FastAPI(title="ROASify API")
 
+# ── CORS ──────────────────────────────────────────────────────────────
+# Set CORS_ORIGINS env var in production, e.g.:
+#   https://roasify.com,https://www.roasify.com
+_raw_origins = os.getenv("CORS_ORIGINS", "*")
+ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",")] if _raw_origins != "*" else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Set specific origin via CORS_ORIGINS env var in production
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 
 def _safe(v):
@@ -95,22 +101,20 @@ async def analyse(
     # ── Build response ────────────────────────────────────────────────
     products_records = df_to_records(merged_df)
 
-    # KPIs
     kpis = {
         "totalProducts":  int(merged_df["Product ID"].nunique()),
-        "totalMetaSpend": float(merged_df["Meta Spend"].sum())    if "Meta Spend"      in merged_df.columns else 0,
-        "totalGoogleCost":float(merged_df["Google Cost"].sum())   if "Google Cost"     in merged_df.columns else 0,
-        "totalSpend":     float(merged_df["Total Spend"].sum())   if "Total Spend"     in merged_df.columns else 0,
-        "totalRevenue":   float(merged_df["Shopify Revenue"].sum()) if "Shopify Revenue" in merged_df.columns else 0,
+        "totalMetaSpend": float(merged_df["Meta Spend"].sum())     if "Meta Spend"      in merged_df.columns else 0,
+        "totalGoogleCost":float(merged_df["Google Cost"].sum())    if "Google Cost"     in merged_df.columns else 0,
+        "totalSpend":     float(merged_df["Total Spend"].sum())    if "Total Spend"     in merged_df.columns else 0,
+        "totalRevenue":   float(merged_df["Shopify Revenue"].sum())if "Shopify Revenue" in merged_df.columns else 0,
     }
     kpis["overallRoi"] = kpis["totalRevenue"] / kpis["totalSpend"] if kpis["totalSpend"] else 0
 
-    # Quadrant data
     quadrants = {
-        "q1": df_to_records(product_result["q1"]),  # Champions
-        "q2": df_to_records(product_result["q2"]),  # Contenders
-        "q3": df_to_records(product_result["q3"]),  # Casualties
-        "q4": df_to_records(product_result["q4"]),  # Cruisers
+        "q1": df_to_records(product_result["q1"]),
+        "q2": df_to_records(product_result["q2"]),
+        "q3": df_to_records(product_result["q3"]),
+        "q4": df_to_records(product_result["q4"]),
         "spCut": _safe(product_result["sp_cut"]),
         "rvCut": _safe(product_result["rv_cut"]),
     }
@@ -119,8 +123,8 @@ async def analyse(
     if discount_result:
         disc_df, months_ordered, disc_merged, insights, overall_insights, title_map = discount_result
         discount_data = {
-            "summary":         df_to_records(disc_df),
-            "monthsOrdered":   months_ordered,
+            "summary":       df_to_records(disc_df),
+            "monthsOrdered": months_ordered,
         }
 
     return {
