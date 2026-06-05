@@ -6,8 +6,8 @@ name: roasify
 # ── BACKEND SERVICE ────────────────────────────────────────────────────────
 services:
   - name: api
-    source_dir: /backend
-    dockerfile_path: backend/Dockerfile
+    source_dir: backend
+    dockerfile_path: Dockerfile
     http_port: 8000
     instance_count: 1
     instance_size_slug: basic-xs
@@ -32,8 +32,8 @@ services:
 # ── FRONTEND STATIC SITE ───────────────────────────────────────────────────
 static_sites:
   - name: frontend
-    source_dir: /
-    build_command: npm run build && npm run export
+    source_dir: .
+    build_command: npm run build
     output_dir: out
     environment_slug: node-js
     envs:
