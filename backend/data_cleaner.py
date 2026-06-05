@@ -56,19 +56,38 @@ def _find_col(df: pd.DataFrame, *keywords: str) -> Optional[str]:
 def _read_file(file_obj, header: int = 0) -> pd.DataFrame:
     name = getattr(file_obj, "name", "")
     if isinstance(name, str) and name.lower().endswith((".xlsx", ".xls")):
-        return pd.read_excel(file_obj, header=header)
-    # Try UTF-8 first, fall back to latin-1 for Windows-exported CSVs
-    try:
-        if hasattr(file_obj, 'seek'):
-            file_obj.seek(0)
-        return pd.read_csv(file_obj, header=header, encoding='utf-8-sig')
-    except UnicodeDecodeError:
-        if hasattr(file_obj, 'seek'):
-            file_obj.seek(0)
-        return pd.read_csv(file_obj, header=header, encoding='latin-1')
+        df = pd.read_excel(file_obj, header=header)
+    else:
+        try:
+            if hasattr(file_obj, 'seek'):
+                file_obj.seek(0)
+            df = pd.read_csv(file_obj, header=header, encoding='utf-8-sig',
+                             on_bad_lines='skip')
+        except UnicodeDecodeError:
+            if hasattr(file_obj, 'seek'):
+                file_obj.seek(0)
+            df = pd.read_csv(file_obj, header=header, encoding='latin-1',
+                             on_bad_lines='skip')
+
+    # Deduplicate column names: duplicate names cause df[col] to return a
+    # DataFrame instead of a Series, which crashes downstream numeric parsing.
+    if df.columns.duplicated().any():
+        seen: dict = {}
+        new_cols = []
+        for c in df.columns:
+            k = str(c)
+            if k in seen:
+                seen[k] += 1
+                new_cols.append(f"{k}.{seen[k]}")
+            else:
+                seen[k] = 0
+                new_cols.append(k)
+        df.columns = new_cols
+
+    return df
 
 
-def _to_numeric_robust(series: pd.Series) -> pd.Series:
+def _to_numeric_robust(series) -> pd.Series:
     """
     Convert a Series to numeric, handling:
     - Indian comma format:  "1,17,126"  → 117126
@@ -76,17 +95,27 @@ def _to_numeric_robust(series: pd.Series) -> pd.Series:
     - Percentage strings:  "4.3%"       → 4.3
     - Plain floats:        "50000"      → 50000
     - NaN / empty         → 0
+    - DataFrame input (duplicate col names) → uses first column
     """
+    # Guard: duplicate column names cause df[col] to return a DataFrame
+    if isinstance(series, pd.DataFrame):
+        series = series.iloc[:, 0]
+
     def _parse(v):
-        if pd.isna(v):
+        # Guard: v must be scalar — never a Series/DataFrame
+        if isinstance(v, (pd.Series, pd.DataFrame)):
+            v = v.iloc[0] if len(v) > 0 else None
+        try:
+            is_na = pd.isna(v)
+        except (ValueError, TypeError):
+            is_na = False
+        if is_na:
             return 0.0
         s = str(v).strip()
         if not s or s.lower() in ('nan', 'none', '-', '—', 'n/a'):
             return 0.0
-        # Strip % sign
-        s = s.rstrip('%')
-        # Remove commas (Indian or Western format)
-        s = s.replace(',', '')
+        s = s.rstrip('%')          # strip % sign
+        s = s.replace(',', '')     # strip Indian / Western commas
         try:
             return float(s)
         except (ValueError, TypeError):
