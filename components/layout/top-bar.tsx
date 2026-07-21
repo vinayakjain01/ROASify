@@ -1,9 +1,10 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { CalendarDays, Share2, Download, HelpCircle, MoreVertical, Check, ChevronDown } from 'lucide-react';
+import { CalendarDays, Coins, Share2, Download, HelpCircle, MoreVertical, Check, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/lib/context';
+import { CURRENCIES } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 
 interface TopBarProps {
@@ -11,17 +12,22 @@ interface TopBarProps {
 }
 
 export function TopBar({ breadcrumbs }: TopBarProps) {
-  const { allMonths, selectedMonths, toggleMonth, selectAllMonths } = useApp();
+  const { allMonths, selectedMonths, toggleMonth, selectAllMonths, currency, setCurrency } = useApp();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const [currencyOpen, setCurrencyOpen] = useState(false);
+  const currencyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handle(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (currencyRef.current && !currencyRef.current.contains(e.target as Node)) setCurrencyOpen(false);
     }
     document.addEventListener('mousedown', handle);
     return () => document.removeEventListener('mousedown', handle);
   }, []);
+
+  const activeCurrency = CURRENCIES.find(c => c.code === currency) ?? CURRENCIES[0];
 
   const allSelected = allMonths.length > 0 && selectedMonths.size === allMonths.length;
   const hasMonths   = allMonths.length > 0;
@@ -116,6 +122,46 @@ export function TopBar({ breadcrumbs }: TopBarProps) {
 
       {/* Actions */}
       <div className="flex items-center gap-2">
+        {/* Currency picker — cosmetic symbol swap only, values are never converted */}
+        <div className="relative" ref={currencyRef}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 border-[#DEDBD2] font-normal gap-1.5"
+            onClick={() => setCurrencyOpen(o => !o)}
+            title="Change displayed currency symbol (does not convert values)"
+          >
+            <Coins className="w-3.5 h-3.5 text-[#8B8780]" />
+            {activeCurrency.code}
+            <ChevronDown className={cn('w-3 h-3 text-[#8B8780] transition-transform', currencyOpen && 'rotate-180')} />
+          </Button>
+
+          {currencyOpen && (
+            <div className="absolute top-10 right-0 z-50 bg-white rounded-xl border border-[#EEECE5] shadow-xl py-2 min-w-[210px]">
+              {CURRENCIES.map(c => {
+                const active = c.code === currency;
+                return (
+                  <button
+                    key={c.code}
+                    onClick={() => { setCurrency(c.code); setCurrencyOpen(false); }}
+                    className={cn(
+                      'w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors',
+                      active ? 'bg-[#EEF2FF] text-[#4F46E5] font-medium' : 'hover:bg-[#F2F0EA] text-[#1A1814]'
+                    )}
+                  >
+                    <span>{c.symbol} {c.label}</span>
+                    {active && <Check className="w-4 h-4 text-[#4F46E5]" />}
+                  </button>
+                );
+              })}
+              <div className="h-px bg-[#EEECE5] mt-1 mb-2" />
+              <p className="text-[11px] text-[#8B8780] px-4 pb-1 leading-relaxed">
+                Changes the symbol shown only — figures aren&apos;t converted.
+              </p>
+            </div>
+          )}
+        </div>
+
         <Button variant="outline" size="sm" className="h-8 px-3 border-[#DEDBD2]">
           <Share2 className="w-4 h-4 mr-2" />Share
         </Button>

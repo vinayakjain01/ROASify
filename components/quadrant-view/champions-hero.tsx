@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ArrowRight, Star, Download, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/lib/context';
-import { inr, roi, roiColor } from '@/lib/formatters';
+import { inr, roi, roiColor, currencySymbol } from '@/lib/formatters';
 
 interface Props { spendThreshold: number; revenueThreshold: number; }
 
@@ -49,7 +49,7 @@ export function ChampionsHero({ spendThreshold, revenueThreshold }: Props) {
       ['ROASify — Scale-Spend Plan for Champions'],
       ['Generated', new Date().toLocaleString('en-IN')],
       [],
-      ['Product', 'Current Spend (₹)', 'Suggested Budget (+50%)', 'Expected Revenue', 'Conservative ROI'],
+      [`Product`, `Current Spend (${currencySymbol()})`, `Suggested Budget (+50%)`, `Expected Revenue`, `Conservative ROI`],
       ...scalePlans.map(p => [
         p.product,
         String(Math.round(p.currentSpend)),
@@ -98,7 +98,7 @@ export function ChampionsHero({ spendThreshold, revenueThreshold }: Props) {
                 Revenue {inr(p.revenue)} · {p.itemsSold.toLocaleString()} units
               </div>
               <p className="text-xs text-[#57544E] line-clamp-2">
-                Returns {roi(p.roi)} per ₹1 spent — scale while creative performs.
+                Returns {roi(p.roi)} per {currencySymbol()}1 spent — scale while creative performs.
               </p>
             </div>
           ))}

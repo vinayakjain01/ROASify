@@ -1,16 +1,67 @@
+// ── Display currency ────────────────────────────────────────────────────────
+// Purely cosmetic: swaps the symbol/grouping shown next to money values.
+// Underlying numbers are never converted — see lib/context.tsx for the
+// persisted selection and components/layout/top-bar.tsx for the picker UI.
+export type CurrencyCode = "INR" | "USD" | "CAD" | "EUR" | "GBP" | "AUD";
+
+export interface CurrencyOption {
+  code: CurrencyCode;
+  symbol: string;
+  label: string;
+  locale: string;
+}
+
+export const CURRENCIES: CurrencyOption[] = [
+  { code: "INR", symbol: "₹",   label: "Indian Rupee",     locale: "en-IN" },
+  { code: "USD", symbol: "$",   label: "US Dollar",        locale: "en-US" },
+  { code: "CAD", symbol: "CA$", label: "Canadian Dollar",  locale: "en-CA" },
+  { code: "EUR", symbol: "€",   label: "Euro",             locale: "en-IE" },
+  { code: "GBP", symbol: "£",   label: "British Pound",    locale: "en-GB" },
+  { code: "AUD", symbol: "A$",  label: "Australian Dollar", locale: "en-AU" },
+];
+
+let activeCurrency: CurrencyOption = CURRENCIES[0];
+
+export function setActiveCurrency(code: CurrencyCode): void {
+  activeCurrency = CURRENCIES.find(c => c.code === code) ?? CURRENCIES[0];
+}
+
+export function getActiveCurrency(): CurrencyOption {
+  return activeCurrency;
+}
+
+export function currencySymbol(): string {
+  return activeCurrency.symbol;
+}
+
 export function inr(n: number | null | undefined, compact = false): string {
   if (n == null || isNaN(n)) return "—";
-  const v = Math.round(n);
+  const { symbol, locale, code } = activeCurrency;
+
+  // Rounding straight to whole units makes any genuine amount under ~0.5
+  // display as a misleading "0" — this shows up constantly on per-product
+  // averages/values once a catalog is large enough that spend or revenue
+  // per item drops below one currency unit. Keep cents for small amounts;
+  // large totals still render as clean whole units.
+  const abs = Math.abs(n);
+  const decimals = abs > 0 && abs < 10 ? 2 : 0;
+  const v = decimals ? n : Math.round(n);
 
   if (compact) {
-    const abs = Math.abs(v);
-    if (abs >= 1_00_00_000) return `₹${(v / 1_00_00_000).toFixed(1).replace(/\.0$/, "")}Cr`;
-    if (abs >= 1_00_000)    return `₹${(v / 1_00_000).toFixed(1).replace(/\.0$/, "")}L`;
-    if (abs >= 1_000)       return `₹${(v / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
-    return `₹${v}`;
+    const absV = Math.abs(v);
+    if (code === "INR") {
+      if (absV >= 1_00_00_000) return `${symbol}${(v / 1_00_00_000).toFixed(1).replace(/\.0$/, "")}Cr`;
+      if (absV >= 1_00_000)    return `${symbol}${(v / 1_00_000).toFixed(1).replace(/\.0$/, "")}L`;
+      if (absV >= 1_000)       return `${symbol}${(v / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+      return `${symbol}${v.toFixed(decimals)}`;
+    }
+    if (absV >= 1_000_000_000) return `${symbol}${(v / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
+    if (absV >= 1_000_000)     return `${symbol}${(v / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+    if (absV >= 1_000)         return `${symbol}${(v / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+    return `${symbol}${v.toFixed(decimals)}`;
   }
 
-  return "₹" + v.toLocaleString("en-IN");
+  return symbol + v.toLocaleString(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
 export function roi(n: number | null | undefined): string {

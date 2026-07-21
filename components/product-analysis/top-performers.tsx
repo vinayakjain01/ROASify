@@ -1,7 +1,7 @@
 'use client';
 
 import { useApp } from '@/lib/context';
-import { inr, roi, roiColor } from '@/lib/formatters';
+import { inr, roi, roiColor, currencySymbol } from '@/lib/formatters';
 
 interface TopPerformersProps {
   tableRef?: React.RefObject<HTMLDivElement>;
@@ -78,7 +78,7 @@ export function TopPerformers({ tableRef }: TopPerformersProps) {
             </div>
             <p className="text-sm text-[#57544E] line-clamp-2">
               {index === 0
-                ? `Returns ${roi(p.roi)} per ₹1 spent — highest ROI with confirmed ad spend.`
+                ? `Returns ${roi(p.roi)} per ${currencySymbol()}1 spent — highest ROI with confirmed ad spend.`
                 : index === 1
                 ? `Delivers ${roi(p.roi)} ROI, moving ${p.itemsSold.toLocaleString()} units efficiently.`
                 : `Achieves ${roi(p.roi)} ROI with strong unit economics.`}

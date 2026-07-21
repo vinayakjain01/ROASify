@@ -73,7 +73,7 @@ export function ComparisonCard({ discountedStats: d, nonDiscountedStats: nd }: {
         <MetricRow label="ROI"        discountedValue={d.roi}     nonDiscountedValue={nd.roi}     format={roi} />
         <MetricRow label="Items Sold" discountedValue={d.items}   nonDiscountedValue={nd.items} />
         <MetricRow label="Avg. CTR"   discountedValue={d.avgCtr}  nonDiscountedValue={nd.avgCtr}  format={(v) => v.toFixed(1) + '%'} />
-        <MetricRow label="Avg. CPM"   discountedValue={d.avgCpm}  nonDiscountedValue={nd.avgCpm}  format={(v) => '₹' + Math.round(v)} higherIsBetter={false} />
+        <MetricRow label="Avg. CPM"   discountedValue={d.avgCpm}  nonDiscountedValue={nd.avgCpm}  format={inr} higherIsBetter={false} />
       </div>
     </div>
   );

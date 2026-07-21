@@ -3,6 +3,7 @@ import {
   createContext, useContext, useState, useCallback,
   useMemo, useEffect, ReactNode,
 } from "react";
+import { CurrencyCode, CURRENCIES, setActiveCurrency } from "./formatters";
 
 // ── Raw Product shape from API ─────────────────────────────────────────────
 export interface Product {
@@ -164,6 +165,18 @@ interface AppState {
   quadrantData: QuadrantData | null;
   setQuadrantData: (d: QuadrantData) => void;
   clearQuadrantData: () => void;
+
+  // ── Display currency — cosmetic symbol swap only, no FX conversion ──
+  currency: CurrencyCode;
+  setCurrency: (c: CurrencyCode) => void;
+}
+
+const CURRENCY_STORAGE_KEY = "roasify_currency";
+
+function loadStoredCurrency(): CurrencyCode {
+  if (typeof window === "undefined") return "INR";
+  const saved = window.localStorage.getItem(CURRENCY_STORAGE_KEY);
+  return (CURRENCIES.some(c => c.code === saved) ? saved : "INR") as CurrencyCode;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -186,6 +199,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ── Month selection — lives here so TopBar and pages share the same state
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
+
+  // ── Display currency — persisted, symbol/grouping only, no FX conversion
+  // Always start from "INR" (matches SSR, which has no access to
+  // localStorage) — the persisted value is applied client-side in the
+  // effect below. Reading localStorage in the useState initializer would
+  // make the client's first render diverge from the server-rendered HTML
+  // and trigger a hydration-mismatch error.
+  const [currency, setCurrencyRaw] = useState<CurrencyCode>("INR");
+
+  // Keep the formatters module in sync on every render so every inr() call
+  // below this provider sees the right symbol.
+  setActiveCurrency(currency);
+
+  const setCurrency = useCallback((c: CurrencyCode) => {
+    setActiveCurrency(c);
+    setCurrencyRaw(c);
+    if (typeof window !== "undefined") window.localStorage.setItem(CURRENCY_STORAGE_KEY, c);
+  }, []);
+
+  // Apply the persisted currency once mounted on the client (post-hydration).
+  useEffect(() => {
+    const saved = loadStoredCurrency();
+    if (saved !== "INR") {
+      setActiveCurrency(saved);
+      setCurrencyRaw(saved);
+    }
+  }, []);
 
   const setMetaFile     = useCallback((f: File | null) => setMetaRaw(toStored(f)),    []);
   const setShopifyFile  = useCallback((f: File | null) => setShopifyRaw(toStored(f)), []);
@@ -284,6 +324,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       allMonths, selectedMonths, toggleMonth, selectAllMonths,
       aggregatedProducts,
       quadrantData, setQuadrantData, clearQuadrantData,
+      currency, setCurrency,
     }}>
       {children}
     </AppContext.Provider>

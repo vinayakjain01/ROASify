@@ -87,12 +87,16 @@ def _read_file(file_obj, header: int = 0) -> pd.DataFrame:
     return df
 
 
+_CURRENCY_JUNK_RE = re.compile(r'[^0-9.,\-]')
+
+
 def _to_numeric_robust(series) -> pd.Series:
     """
     Convert a Series to numeric, handling:
     - Indian comma format:  "1,17,126"  → 117126
     - Thousand separators: "50,000"     → 50000
     - Percentage strings:  "4.3%"       → 4.3
+    - Currency symbols/codes: "$1,234.56", "CA$500", "500 CAD", "₹500" → 1234.56 / 500 / 500 / 500
     - Plain floats:        "50000"      → 50000
     - NaN / empty         → 0
     - DataFrame input (duplicate col names) → uses first column
@@ -114,8 +118,14 @@ def _to_numeric_robust(series) -> pd.Series:
         s = str(v).strip()
         if not s or s.lower() in ('nan', 'none', '-', '—', 'n/a'):
             return 0.0
-        s = s.rstrip('%')          # strip % sign
-        s = s.replace(',', '')     # strip Indian / Western commas
+        s = s.rstrip('%')                 # strip % sign
+        # Strip currency symbols/codes (₹, $, CA$, USD, CAD, €, £, ...) —
+        # any exported currency other than plain INR numbers used to fall
+        # through to float() and silently return 0.
+        s = _CURRENCY_JUNK_RE.sub('', s)
+        s = s.replace(',', '')            # strip Indian / Western thousand separators
+        if not s or s == '-':
+            return 0.0
         try:
             return float(s)
         except (ValueError, TypeError):

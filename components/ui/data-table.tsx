@@ -91,7 +91,7 @@ export function DataTable({
         return <span className="tabular-nums">{Number(value ?? 0).toFixed(1)}%</span>;
 
       case 'cpm':
-        return <span className="tabular-nums">₹{Number(value ?? 0).toLocaleString('en-IN')}</span>;
+        return <span className="tabular-nums">{inr(Number(value ?? 0))}</span>;
 
       case 'category':
         return String(value ?? '');
