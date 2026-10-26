@@ -1,10 +1,20 @@
 # backend/main.py
-import os, io, math, traceback
-from fastapi import FastAPI, UploadFile, File, HTTPException # type: ignore
+import os, io, math, sys, traceback
+from fastapi import FastAPI, UploadFile, File, Form, Query, HTTPException # type: ignore
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
 import pandas as pd
 from data_cleaner import clean_meta, clean_shopify, clean_google
 from analytics import run_overall_view, run_product_analysis, run_discount_analysis
+from integrations.growifyos_client import (
+    GrowifyOSError,
+    get_brands,
+    get_status,
+    get_meta_products,
+    get_shopify_variants,
+)
+from integrations.growifyos_mapper import map_meta_products, map_shopify_variants
+
+LIVE_UNAVAILABLE_MSG = "Live data unavailable — try again or use file upload"
 
 app = FastAPI(title="ROASify API")
 
@@ -163,6 +173,151 @@ async def analyse(
             "meta_spend":  kpis["totalMetaSpend"],
             "google_cost": kpis["totalGoogleCost"],
         },
+    }
+
+
+@app.get("/api/brands")
+def api_brands():
+    try:
+        brands = get_brands()
+    except GrowifyOSError as e:
+        print(f"[growifyos] /api/brands failed: {e}", file=sys.stderr)
+        raise HTTPException(status_code=502, detail=LIVE_UNAVAILABLE_MSG)
+    return {"ok": True, "brands": brands}
+
+
+@app.get("/api/live-status")
+def api_live_status(brandId: str = Query(...)):
+    try:
+        status = get_status(brandId)
+    except GrowifyOSError as e:
+        print(f"[growifyos] /api/live-status failed: {e}", file=sys.stderr)
+        raise HTTPException(status_code=502, detail=LIVE_UNAVAILABLE_MSG)
+    return {"ok": True, "status": status}
+
+
+@app.post("/api/analyse-live")
+async def analyse_live(
+    brandId: str = Form(...),
+    from_: str = Form(..., alias="from"),
+    to: str = Form(...),
+    discount_file: UploadFile = File(None),
+    spend_pct_thresh: float = Form(100),
+    rev_pct_thresh: float = Form(100),
+):
+    # ── Fetch + map live data (client raises GrowifyOSError on any failure,
+    #    including a partial-page failure mid-pagination) ─────────────────
+    try:
+        meta_rows    = get_meta_products(brandId, from_, to)
+        shopify_rows = get_shopify_variants(brandId, from_, to)
+    except GrowifyOSError as e:
+        print(f"[growifyos] /api/analyse-live failed: {e}", file=sys.stderr)
+        raise HTTPException(status_code=502, detail=LIVE_UNAVAILABLE_MSG)
+
+    meta_df    = map_meta_products(meta_rows)
+    shopify_df = map_shopify_variants(shopify_rows)
+
+    if len(meta_df) == 0:
+        raise HTTPException(status_code=422, detail="No Meta data for this brand/date range.")
+    if len(shopify_df) == 0:
+        raise HTTPException(status_code=422, detail="No Shopify data for this brand/date range.")
+
+    # ── Discount list (optional) — parsed inline here rather than shared
+    #    with /api/analyse, so that endpoint's code path is never touched ──
+    discount_df    = None
+    discount_warns = []
+    if discount_file:
+        try:
+            disc_bytes  = await discount_file.read()
+            disc_io     = io.BytesIO(disc_bytes); disc_io.name = discount_file.filename
+            disc_df_raw = pd.read_csv(disc_io, encoding='utf-8-sig') if disc_io.name.endswith('.csv') \
+                          else pd.read_excel(disc_io)
+            disc_df_raw.columns = [str(c).strip() for c in disc_df_raw.columns]
+            pid_col = next((c for c in disc_df_raw.columns if 'product id' in c.lower()), None)
+            if pid_col:
+                discount_df = disc_df_raw.rename(columns={pid_col: "Product ID"})
+            else:
+                discount_warns = ["Discount file: 'Product ID' column not found."]
+        except Exception as e:
+            discount_warns = [f"Discount file skipped: {e}"]
+
+    # ── Run Overall View (Google not available in Live Sync yet) ────────
+    try:
+        merged_df, has_month = run_overall_view(meta_df, shopify_df, None)
+    except Exception as e:
+        tb = traceback.format_exc()
+        raise HTTPException(status_code=500, detail=f"Merge error: {e}\n\n{tb}")
+
+    # ── Run Product Analysis ─────────────────────────────────────────
+    try:
+        product_result = run_product_analysis(
+            meta_df, shopify_df,
+            spend_pct_thresh=spend_pct_thresh,
+            rev_pct_thresh=rev_pct_thresh,
+        )
+    except Exception as e:
+        tb = traceback.format_exc()
+        raise HTTPException(status_code=500, detail=f"Product analysis error: {e}\n\n{tb}")
+
+    # ── Run Discount Analysis (only if discount file provided) ───────
+    discount_data = None
+    if discount_df is not None:
+        try:
+            disc_result = run_discount_analysis(
+                meta_df, shopify_df,
+                discount=discount_df,
+                spend_pct_thresh=spend_pct_thresh,
+                rev_pct_thresh=rev_pct_thresh,
+            )
+            disc_df_out, months_ordered, disc_merged, insights, overall_insights, title_map = disc_result
+            discount_data = {
+                "summary":       df_to_records(disc_df_out),
+                "monthsOrdered": months_ordered,
+            }
+        except Exception as e:
+            discount_warns.append(f"Discount analysis skipped: {e}")
+
+    # ── Build KPIs ───────────────────────────────────────────────────
+    kpis = {
+        "totalProducts":   int(merged_df["Product ID"].nunique()),
+        "totalMetaSpend":  float(merged_df["Meta Spend"].sum())      if "Meta Spend"      in merged_df.columns else 0,
+        "totalGoogleCost": float(merged_df["Google Cost"].sum())     if "Google Cost"     in merged_df.columns else 0,
+        "totalSpend":      float(merged_df["Total Spend"].sum())     if "Total Spend"     in merged_df.columns else 0,
+        "totalRevenue":    float(merged_df["Shopify Revenue"].sum()) if "Shopify Revenue" in merged_df.columns else 0,
+    }
+    kpis["overallRoi"] = kpis["totalRevenue"] / kpis["totalSpend"] if kpis["totalSpend"] else 0
+
+    return {
+        "ok":           True,
+        "hasMonth":     has_month,
+        "hasGoogle":    False,
+        "products":     df_to_records(merged_df),
+        "kpis":         kpis,
+        "quadrants": {
+            "q1":    df_to_records(product_result["q1"]),
+            "q2":    df_to_records(product_result["q2"]),
+            "q3":    df_to_records(product_result["q3"]),
+            "q4":    df_to_records(product_result["q4"]),
+            "spCut": _safe(product_result["sp_cut"]),
+            "rvCut": _safe(product_result["rv_cut"]),
+        },
+        "discountData": discount_data,
+        "warnings":     discount_warns,
+        "summary": {
+            "products":    product_result["all"].to_dict(orient="records") if not product_result["all"].empty else [],
+            "total_spend": kpis["totalSpend"],
+            "total_rev":   kpis["totalRevenue"],
+            "roi":         kpis["overallRoi"],
+            "meta_spend":  kpis["totalMetaSpend"],
+            "google_cost": kpis["totalGoogleCost"],
+        },
+        # Product-level Meta spend from meta-products only covers catalog/product
+        # ads — it will never sum to the full ad account total. Same behavior as
+        # the manual CSV flow; surfaced here so it isn't mistaken for a bug.
+        "metaSpendNote": (
+            "Meta spend reflects catalog/product ads only and will not match "
+            "your full Meta ad account total — this is expected, same as file upload."
+        ),
     }
 
 

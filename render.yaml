@@ -9,3 +9,9 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      # GrowifyOS Live Sync integration — set real values in the Render
+      # dashboard, never commit them here.
+      - key: GROWIFYOS_API_KEY
+        sync: false
+      - key: GROWIFYOS_BASE_URL
+        value: ""

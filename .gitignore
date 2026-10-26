@@ -7,6 +7,7 @@ __v0_jsx-dev-runtime.ts
 .vercel/
 
 # Environment variables
+.env
 .env*.local
 
 # Common ignores
@@ -16,3 +17,14 @@ node_modules
 
 # Backend virtualenv
 backend/venv/
+backend/.venv*/
+
+# Test artifacts
+# (backend/__pycache__/*.pyc at the repo root are pre-existing tracked files —
+# this only stops NEW __pycache__ dirs, e.g. under backend/tests or
+# backend/integrations, from being accidentally staged going forward.)
+backend/tests/__pycache__/
+backend/integrations/__pycache__/
+backend/.pytest_cache/
+coverage/
+.vitest-cache/

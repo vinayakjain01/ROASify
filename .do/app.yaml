@@ -25,6 +25,16 @@ services:
       - key: PORT
         value: "8000"
         scope: RUN_AND_BUILD_TIME
+      # GrowifyOS Live Sync integration — set the real key value in the
+      # DigitalOcean dashboard (App Settings > Environment Variables),
+      # never commit it here.
+      - key: GROWIFYOS_API_KEY
+        value: ""
+        scope: RUN_TIME
+        type: SECRET
+      - key: GROWIFYOS_BASE_URL
+        value: ""
+        scope: RUN_TIME
     routes:
       - path: /api
       - path: /health

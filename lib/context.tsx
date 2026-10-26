@@ -61,6 +61,10 @@ export interface QuadrantData {
 
 interface StoredFile { file: File; name: string; size: number; }
 
+// ── Live Sync ────────────────────────────────────────────────────────────
+export type DataSource = "upload" | "live";
+export interface LiveDateRange { from?: Date; to?: Date; }
+
 // ── Pure helpers ───────────────────────────────────────────────────────────
 function n(v: any): number { return Number(v ?? 0); }
 
@@ -85,7 +89,7 @@ export function normalizeOne(p: any): NormProduct {
 }
 
 // FIX 2: single-pass loop instead of 8 separate .reduce() calls
-function aggregateGroup(rows: NormProduct[]): NormProduct {
+export function aggregateGroup(rows: NormProduct[]): NormProduct {
   const first = rows[0];
   let totMeta = 0, totGoog = 0, totSpend = 0, totRev = 0;
   let totItems = 0, totLpv = 0, totConv = 0;
@@ -118,7 +122,7 @@ function aggregateGroup(rows: NormProduct[]): NormProduct {
   };
 }
 
-function groupById(rows: NormProduct[]): NormProduct[] {
+export function groupById(rows: NormProduct[]): NormProduct[] {
   const map = new Map<string, NormProduct[]>();
   for (const r of rows) {
     if (!map.has(r.id)) map.set(r.id, []);
@@ -127,7 +131,7 @@ function groupById(rows: NormProduct[]): NormProduct[] {
   return Array.from(map.values()).map(aggregateGroup);
 }
 
-function detectMonths(rows: NormProduct[]): string[] {
+export function detectMonths(rows: NormProduct[]): string[] {
   const set = new Set<string>();
   for (const r of rows) { if (r.month) set.add(r.month); }
   return Array.from(set).sort((a, b) => {
@@ -169,14 +173,34 @@ interface AppState {
   // ── Display currency — cosmetic symbol swap only, no FX conversion ──
   currency: CurrencyCode;
   setCurrency: (c: CurrencyCode) => void;
+
+  // ── Live Sync — alternative data source to file upload ──────────────
+  dataSource: DataSource;
+  setDataSource: (s: DataSource) => void;
+  selectedBrand: string | null;
+  setSelectedBrand: (id: string | null) => void;
+  dateRange: LiveDateRange;
+  setDateRange: (r: LiveDateRange) => void;
+  syncStatus: any | null;
+  setSyncStatus: (s: any | null) => void;
+  // Info note (e.g. "Meta spend is catalog-ads-only") surfaced near spend
+  // totals only while Live Sync data is showing.
+  metaSpendNote: string | null;
+  setMetaSpendNote: (n: string | null) => void;
 }
 
 const CURRENCY_STORAGE_KEY = "roasify_currency";
+const BRAND_STORAGE_KEY    = "roasify_selected_brand";
 
 function loadStoredCurrency(): CurrencyCode {
   if (typeof window === "undefined") return "INR";
   const saved = window.localStorage.getItem(CURRENCY_STORAGE_KEY);
   return (CURRENCIES.some(c => c.code === saved) ? saved : "INR") as CurrencyCode;
+}
+
+function loadStoredBrand(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(BRAND_STORAGE_KEY);
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -207,6 +231,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // make the client's first render diverge from the server-rendered HTML
   // and trigger a hydration-mismatch error.
   const [currency, setCurrencyRaw] = useState<CurrencyCode>("INR");
+
+  // ── Live Sync state ──────────────────────────────────────────────────
+  const [dataSource, setDataSource]       = useState<DataSource>("upload");
+  const [selectedBrand, setSelectedBrandRaw] = useState<string | null>(null);
+  const [dateRange, setDateRange]         = useState<LiveDateRange>({});
+  const [syncStatus, setSyncStatus]       = useState<any | null>(null);
+  const [metaSpendNote, setMetaSpendNote] = useState<string | null>(null);
+
+  const setSelectedBrand = useCallback((id: string | null) => {
+    setSelectedBrandRaw(id);
+    if (typeof window !== "undefined") {
+      if (id) window.localStorage.setItem(BRAND_STORAGE_KEY, id);
+      else window.localStorage.removeItem(BRAND_STORAGE_KEY);
+    }
+  }, []);
+
+  // Apply the persisted brand once mounted on the client (post-hydration),
+  // same rationale as the currency effect above.
+  useEffect(() => {
+    const saved = loadStoredBrand();
+    if (saved) setSelectedBrandRaw(saved);
+  }, []);
 
   // Keep the formatters module in sync on every render so every inr() call
   // below this provider sees the right symbol.
@@ -325,6 +371,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       aggregatedProducts,
       quadrantData, setQuadrantData, clearQuadrantData,
       currency, setCurrency,
+      dataSource, setDataSource,
+      selectedBrand, setSelectedBrand,
+      dateRange, setDateRange,
+      syncStatus, setSyncStatus,
+      metaSpendNote, setMetaSpendNote,
     }}>
       {children}
     </AppContext.Provider>

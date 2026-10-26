@@ -5,6 +5,8 @@ import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { KpiStrip } from '@/components/ui/kpi-card';
 import { DataTable } from '@/components/ui/data-table';
 import { UploadGrid } from '@/components/product-analysis/upload-cards';
+import { LiveSyncPanel } from '@/components/product-analysis/live-sync-panel';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TopPerformers } from '@/components/product-analysis/top-performers';
 import { ColumnsAndFilters } from '@/components/product-analysis/columns-filters';
 import type { ActiveFilter } from '@/components/product-analysis/columns-filters';
@@ -50,6 +52,8 @@ export default function ProductAnalysisPage() {
     aggregatedProducts,   // month-filtered + grouped by product ID
     allMonths,
     selectedMonths,
+    dataSource, setDataSource,
+    metaSpendNote,
   } = useApp();
 
   const [loading,        setLoading]        = useState(false);
@@ -169,25 +173,38 @@ export default function ProductAnalysisPage() {
         </p>
       </div>
 
-      <UploadGrid />
+      <Tabs value={dataSource} onValueChange={(v) => setDataSource(v as 'upload' | 'live')} className="mb-4">
+        <TabsList>
+          <TabsTrigger value="upload">Upload Files</TabsTrigger>
+          <TabsTrigger value="live">Live Sync</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      {/* Merge bar */}
-      <div className="mt-4 bg-white rounded-xl border border-[#EEECE5] px-5 py-3.5 flex items-center justify-between">
-        <p className="text-sm text-[#57544E]">
-          {readyToMerge
-            ? <><span className="font-medium text-[#1A1814]">{fileCount} file{fileCount !== 1 ? 's' : ''}</span> loaded — ready to merge</>
-            : 'Upload Meta Ads and Shopify exports to enable merge. Google Ads is optional.'}
-        </p>
-        <Button
-          onClick={handleMerge}
-          disabled={!readyToMerge || loading}
-          className={cn('bg-[#4F46E5] hover:bg-[#4338CA] min-w-[160px]', (!readyToMerge || loading) && 'opacity-60 cursor-not-allowed')}
-        >
-          {loading
-            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing…</>
-            : '▶  Merge & Analyse'}
-        </Button>
-      </div>
+      {dataSource === 'upload' ? (
+        <>
+          <UploadGrid />
+
+          {/* Merge bar */}
+          <div className="mt-4 bg-white rounded-xl border border-[#EEECE5] px-5 py-3.5 flex items-center justify-between">
+            <p className="text-sm text-[#57544E]">
+              {readyToMerge
+                ? <><span className="font-medium text-[#1A1814]">{fileCount} file{fileCount !== 1 ? 's' : ''}</span> loaded — ready to merge</>
+                : 'Upload Meta Ads and Shopify exports to enable merge. Google Ads is optional.'}
+            </p>
+            <Button
+              onClick={handleMerge}
+              disabled={!readyToMerge || loading}
+              className={cn('bg-[#4F46E5] hover:bg-[#4338CA] min-w-[160px]', (!readyToMerge || loading) && 'opacity-60 cursor-not-allowed')}
+            >
+              {loading
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing…</>
+                : '▶  Merge & Analyse'}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <LiveSyncPanel />
+      )}
 
       {error && (
         <div className="mt-4 bg-red-50 border border-red-200 rounded-xl px-5 py-3.5 flex items-start gap-3">
@@ -223,6 +240,12 @@ export default function ProductAnalysisPage() {
 
           {/* KPIs — live-updated from aggregatedProducts (month-sensitive, ignores search/filters) */}
           {kpiCards.length > 0 && <KpiStrip cards={kpiCards} />}
+
+          {dataSource === 'live' && metaSpendNote && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-xs text-blue-700">
+              ℹ️ {metaSpendNote}
+            </div>
+          )}
 
           {/* Top Performers — month-sensitive, totalSpend > 1 */}
           <TopPerformers tableRef={tableRef} />
