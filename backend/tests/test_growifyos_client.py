@@ -197,6 +197,36 @@ def test_shopify_variants_sends_brand_and_date_range():
     assert params["to"] == "2026-09-24"
 
 
+def test_meta_products_defaults_to_inr_when_currency_not_given():
+    page = {"rows": [], "hasMore": False, "nextOffset": None}
+    with patch.object(gc.requests, "get", return_value=_resp(json_body=page)) as mock_get:
+        gc.get_meta_products("brand-1", "2026-04-01", "2026-09-24")
+    assert mock_get.call_args.kwargs["params"]["currency"] == "INR"
+
+
+def test_shopify_variants_defaults_to_inr_when_currency_not_given():
+    page = {"rows": [], "hasMore": False, "nextOffset": None}
+    with patch.object(gc.requests, "get", return_value=_resp(json_body=page)) as mock_get:
+        gc.get_shopify_variants("brand-1", "2026-04-01", "2026-09-24")
+    assert mock_get.call_args.kwargs["params"]["currency"] == "INR"
+
+
+def test_meta_products_passes_explicit_currency_through():
+    page = {"rows": [], "hasMore": False, "nextOffset": None}
+    with patch.object(gc.requests, "get", return_value=_resp(json_body=page)) as mock_get:
+        gc.get_meta_products("brand-1", "2026-04-01", "2026-09-24", currency="USD")
+    assert mock_get.call_args.kwargs["params"]["currency"] == "USD"
+
+
+def test_shopify_variants_passes_explicit_currency_through():
+    page = {"rows": [], "hasMore": False, "nextOffset": None}
+    with patch.object(gc.requests, "get", return_value=_resp(json_body=page)) as mock_get:
+        gc.get_shopify_variants("brand-1", "2026-04-01", "2026-09-24", currency="EUR")
+    assert mock_get.call_args.kwargs["params"]["currency"] == "EUR"
+    # Still never sends groupBy, regardless of currency.
+    assert "groupBy" not in mock_get.call_args.kwargs["params"]
+
+
 def test_meta_products_request_includes_url_and_headers():
     page = {"rows": [], "hasMore": False, "nextOffset": None}
     with patch.object(gc.requests, "get", return_value=_resp(json_body=page)) as mock_get:

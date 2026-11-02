@@ -187,6 +187,13 @@ interface AppState {
   // totals only while Live Sync data is showing.
   metaSpendNote: string | null;
   setMetaSpendNote: (n: string | null) => void;
+  // The currency the most recent successful Live Sync actually fetched data
+  // in (a real conversion, done server-side by the GrowifyOS API) — distinct
+  // from `currency` above, which is purely a cosmetic symbol swap. While this
+  // is set and dataSource is "live", the top-bar currency picker locks to it
+  // instead of allowing a free (and now incorrect) cosmetic override.
+  syncedCurrency: CurrencyCode | null;
+  setSyncedCurrency: (c: CurrencyCode | null) => void;
 }
 
 const CURRENCY_STORAGE_KEY = "roasify_currency";
@@ -238,6 +245,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [dateRange, setDateRange]         = useState<LiveDateRange>({});
   const [syncStatus, setSyncStatus]       = useState<any | null>(null);
   const [metaSpendNote, setMetaSpendNote] = useState<string | null>(null);
+  const [syncedCurrency, setSyncedCurrency] = useState<CurrencyCode | null>(null);
 
   const setSelectedBrand = useCallback((id: string | null) => {
     setSelectedBrandRaw(id);
@@ -376,6 +384,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       dateRange, setDateRange,
       syncStatus, setSyncStatus,
       metaSpendNote, setMetaSpendNote,
+      syncedCurrency, setSyncedCurrency,
     }}>
       {children}
     </AppContext.Provider>

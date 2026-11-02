@@ -90,10 +90,10 @@ def test_analyse_live_success_shape_matches_analyse_contract():
 
     assert resp.status_code == 200
     body = resp.json()
-    # Same top-level contract as /api/analyse, plus the additive metaSpendNote.
+    # Same top-level contract as /api/analyse, plus the additive metaSpendNote/currency.
     assert set(body.keys()) == {
         "ok", "hasMonth", "hasGoogle", "products", "kpis", "quadrants",
-        "discountData", "warnings", "summary", "metaSpendNote",
+        "discountData", "warnings", "summary", "metaSpendNote", "currency",
     }
     assert body["ok"] is True
     assert body["hasGoogle"] is False
@@ -101,6 +101,37 @@ def test_analyse_live_success_shape_matches_analyse_contract():
     assert body["kpis"]["totalSpend"] == 1000
     assert body["kpis"]["totalRevenue"] == 5000
     assert "catalog/product ads only" in body["metaSpendNote"]
+    assert body["currency"] == "INR"  # default when not specified
+
+
+def test_analyse_live_defaults_to_inr_and_passes_currency_through_to_fetchers():
+    meta_rows = [_meta_row("1001", "Dress", 1000)]
+    shopify_rows = [_shopify_row("1001", "Dress", "S", 5000)]
+
+    with patch.object(main, "get_meta_products", return_value=meta_rows) as mock_meta, \
+         patch.object(main, "get_shopify_variants", return_value=shopify_rows) as mock_shopify:
+        resp = client.post("/api/analyse-live", data={
+            "brandId": "b1", "from": "2026-04-01", "to": "2026-04-30", "currency": "USD",
+        })
+
+    assert resp.status_code == 200
+    assert resp.json()["currency"] == "USD"
+    mock_meta.assert_called_once_with("b1", "2026-04-01", "2026-04-30", "USD")
+    mock_shopify.assert_called_once_with("b1", "2026-04-01", "2026-04-30", "USD")
+
+
+def test_analyse_live_omitted_currency_defaults_to_inr_in_fetcher_calls():
+    meta_rows = [_meta_row("1001", "Dress", 1000)]
+    shopify_rows = [_shopify_row("1001", "Dress", "S", 5000)]
+
+    with patch.object(main, "get_meta_products", return_value=meta_rows) as mock_meta, \
+         patch.object(main, "get_shopify_variants", return_value=shopify_rows) as mock_shopify:
+        client.post("/api/analyse-live", data={
+            "brandId": "b1", "from": "2026-04-01", "to": "2026-04-30",
+        })
+
+    mock_meta.assert_called_once_with("b1", "2026-04-01", "2026-04-30", "INR")
+    mock_shopify.assert_called_once_with("b1", "2026-04-01", "2026-04-30", "INR")
 
 
 def test_analyse_live_fetch_failure_returns_friendly_message():

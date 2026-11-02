@@ -202,14 +202,15 @@ async def analyse_live(
     from_: str = Form(..., alias="from"),
     to: str = Form(...),
     discount_file: UploadFile = File(None),
+    currency: str = Form("INR"),
     spend_pct_thresh: float = Form(100),
     rev_pct_thresh: float = Form(100),
 ):
     # ── Fetch + map live data (client raises GrowifyOSError on any failure,
     #    including a partial-page failure mid-pagination) ─────────────────
     try:
-        meta_rows    = get_meta_products(brandId, from_, to)
-        shopify_rows = get_shopify_variants(brandId, from_, to)
+        meta_rows    = get_meta_products(brandId, from_, to, currency)
+        shopify_rows = get_shopify_variants(brandId, from_, to, currency)
     except GrowifyOSError as e:
         print(f"[growifyos] /api/analyse-live failed: {e}", file=sys.stderr)
         raise HTTPException(status_code=502, detail=LIVE_UNAVAILABLE_MSG)
@@ -318,6 +319,9 @@ async def analyse_live(
             "Meta spend reflects catalog/product ads only and will not match "
             "your full Meta ad account total — this is expected, same as file upload."
         ),
+        # Echoes back the currency actually used for this fetch, so the
+        # frontend can lock its display symbol to it rather than guessing.
+        "currency": currency,
     }
 
 

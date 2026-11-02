@@ -129,6 +129,7 @@ export async function analyseLive(
   from: string,
   to: string,
   discountFile?: File | null,
+  currency = "INR",
   spendPct = 100,
   revPct   = 100
 ) {
@@ -137,6 +138,7 @@ export async function analyseLive(
   fd.append("from", from);
   fd.append("to", to);
   if (discountFile) fd.append("discount_file", discountFile);
+  fd.append("currency", currency);
   fd.append("spend_pct_thresh", String(spendPct));
   fd.append("rev_pct_thresh", String(revPct));
   return post("/api/analyse-live", fd);

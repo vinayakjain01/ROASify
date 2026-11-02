@@ -66,6 +66,20 @@ describe('analyseLive / mergeFiles — request construction', () => {
     expect(fd.get('from')).toBe('2026-04-01');
     expect(fd.get('to')).toBe('2026-09-24');
     expect(fd.get('discount_file')).toBeNull();
+    expect(fd.get('currency')).toBe('INR'); // default when not specified
+  });
+
+  it('passes an explicit currency through', async () => {
+    let capturedBody: FormData | undefined;
+    global.fetch = vi.fn().mockImplementation((_url, init) => {
+      capturedBody = init.body;
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    }) as any;
+
+    await analyseLive('ridhi-mehra', '2026-04-01', '2026-09-24', null, 'USD');
+
+    const fd = capturedBody as FormData;
+    expect(fd.get('currency')).toBe('USD');
   });
 
   it('includes the discount file when provided', async () => {

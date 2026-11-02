@@ -103,11 +103,14 @@ def get_status(brand_id: str) -> dict:
     return _get("/status", {"brandId": brand_id})
 
 
-def get_meta_products(brand_id: str, date_from: str, date_to: str) -> list:
-    return _get_paginated("/meta-products", {"brandId": brand_id, "from": date_from, "to": date_to})
+def get_meta_products(brand_id: str, date_from: str, date_to: str, currency: str = "INR") -> list:
+    return _get_paginated(
+        "/meta-products",
+        {"brandId": brand_id, "from": date_from, "to": date_to, "currency": currency},
+    )
 
 
-def get_shopify_variants(brand_id: str, date_from: str, date_to: str) -> list:
+def get_shopify_variants(brand_id: str, date_from: str, date_to: str, currency: str = "INR") -> list:
     # Do NOT pass groupBy=product — per the API owner, that param rolled data
     # up to product level and blanked variant fields (variantTitle/sku were
     # unusable). Rows come back per-variant; analytics.py already groups by
@@ -115,5 +118,5 @@ def get_shopify_variants(brand_id: str, date_from: str, date_to: str) -> list:
     # variant-level rows collapse to the same product-level totals.
     return _get_paginated(
         "/shopify-variants",
-        {"brandId": brand_id, "from": date_from, "to": date_to},
+        {"brandId": brand_id, "from": date_from, "to": date_to, "currency": currency},
     )

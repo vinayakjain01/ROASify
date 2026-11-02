@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { CalendarDays, Coins, Share2, Download, HelpCircle, MoreVertical, Check, ChevronDown } from 'lucide-react';
+import { CalendarDays, Coins, Share2, Download, HelpCircle, MoreVertical, Check, ChevronDown, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/lib/context';
 import { CURRENCIES } from '@/lib/formatters';
@@ -12,7 +12,14 @@ interface TopBarProps {
 }
 
 export function TopBar({ breadcrumbs }: TopBarProps) {
-  const { allMonths, selectedMonths, toggleMonth, selectAllMonths, currency, setCurrency } = useApp();
+  const {
+    allMonths, selectedMonths, toggleMonth, selectAllMonths, currency, setCurrency,
+    dataSource, syncedCurrency,
+  } = useApp();
+  // Live Sync fetches real, server-converted values in syncedCurrency — once
+  // that's showing, an independent cosmetic symbol choice here would mislabel
+  // real numbers, so the picker locks to match instead of staying free.
+  const currencyLocked = dataSource === 'live' && syncedCurrency != null;
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const [currencyOpen, setCurrencyOpen] = useState(false);
@@ -122,21 +129,29 @@ export function TopBar({ breadcrumbs }: TopBarProps) {
 
       {/* Actions */}
       <div className="flex items-center gap-2">
-        {/* Currency picker — cosmetic symbol swap only, values are never converted */}
+        {/* Currency picker — cosmetic symbol swap only when data is uploaded;
+            locked to the real, server-converted currency while Live Sync data
+            is showing, since a free symbol choice would mislabel real numbers. */}
         <div className="relative" ref={currencyRef}>
           <Button
             variant="outline"
             size="sm"
-            className="h-8 px-3 border-[#DEDBD2] font-normal gap-1.5"
-            onClick={() => setCurrencyOpen(o => !o)}
-            title="Change displayed currency symbol (does not convert values)"
+            className={cn('h-8 px-3 border-[#DEDBD2] font-normal gap-1.5', currencyLocked && 'opacity-80 cursor-default')}
+            onClick={() => { if (!currencyLocked) setCurrencyOpen(o => !o); }}
+            title={
+              currencyLocked
+                ? `Values were fetched in ${activeCurrency.code} via Live Sync — switch to Upload Files or re-sync to change.`
+                : 'Change displayed currency symbol (does not convert values)'
+            }
           >
-            <Coins className="w-3.5 h-3.5 text-[#8B8780]" />
+            {currencyLocked ? <Lock className="w-3.5 h-3.5 text-[#8B8780]" /> : <Coins className="w-3.5 h-3.5 text-[#8B8780]" />}
             {activeCurrency.code}
-            <ChevronDown className={cn('w-3 h-3 text-[#8B8780] transition-transform', currencyOpen && 'rotate-180')} />
+            {!currencyLocked && (
+              <ChevronDown className={cn('w-3 h-3 text-[#8B8780] transition-transform', currencyOpen && 'rotate-180')} />
+            )}
           </Button>
 
-          {currencyOpen && (
+          {currencyOpen && !currencyLocked && (
             <div className="absolute top-10 right-0 z-50 bg-white rounded-xl border border-[#EEECE5] shadow-xl py-2 min-w-[210px]">
               {CURRENCIES.map(c => {
                 const active = c.code === currency;

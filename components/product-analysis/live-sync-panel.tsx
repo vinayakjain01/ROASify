@@ -12,6 +12,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { CalendarDays, AlertTriangle, CheckCircle2, Upload, X } from 'lucide-react';
 import { useApp } from '@/lib/context';
 import { fetchBrands, fetchLiveStatus, analyseLive, type Brand } from '@/lib/api';
+import { CURRENCIES, type CurrencyCode } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 
 // Data only exists from April 2026 onward — floor the picker there until a
@@ -34,6 +35,7 @@ export function LiveSyncPanel() {
     dateRange, setDateRange,
     syncStatus, setSyncStatus,
     setMergedResult, setMetaSpendNote,
+    setCurrency, setSyncedCurrency,
   } = useApp();
 
   const [brands, setBrands]             = useState<Brand[]>([]);
@@ -44,6 +46,11 @@ export function LiveSyncPanel() {
   const [statusError, setStatusError]     = useState<string | null>(null);
 
   const [discountFile, setDiscountFile] = useState<File | null>(null);
+
+  // Currency this sync will fetch in — a REAL conversion done by the API,
+  // unlike the top bar's cosmetic-only symbol swap. Defaults to INR, which
+  // is also what the backend defaults to if this were ever omitted.
+  const [syncCurrency, setSyncCurrency] = useState<CurrencyCode>('INR');
 
   const [syncing, setSyncing]     = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -104,7 +111,8 @@ export function LiveSyncPanel() {
         selectedBrand,
         toISODate(dateRange.from),
         toISODate(dateRange.to),
-        discountFile
+        discountFile,
+        syncCurrency
       );
       const products: any[] = result.products ?? [];
       const summary          = result.summary  ?? {};
@@ -125,6 +133,13 @@ export function LiveSyncPanel() {
       }, result.hasMonth ?? false, false, warns);
 
       setMetaSpendNote(result.metaSpendNote ?? null);
+
+      // Lock the top bar's display symbol to the currency we actually just
+      // fetched in — the API performed a real conversion, so an independent
+      // cosmetic symbol choice would now be actively misleading.
+      const actualCurrency = (result.currency ?? syncCurrency) as CurrencyCode;
+      setCurrency(actualCurrency);
+      setSyncedCurrency(actualCurrency);
     } catch {
       // Never surface the raw error (which may embed backend detail meant for
       // logs) — always show the plain, actionable message.
@@ -132,7 +147,7 @@ export function LiveSyncPanel() {
     } finally {
       setSyncing(false);
     }
-  }, [selectedBrand, dateRange, discountFile, setMergedResult, setMetaSpendNote]);
+  }, [selectedBrand, dateRange, discountFile, syncCurrency, setMergedResult, setMetaSpendNote, setCurrency, setSyncedCurrency]);
 
   const metaStatus    = syncStatus?.meta;
   const shopifyStatus = syncStatus?.shopify;
@@ -146,7 +161,7 @@ export function LiveSyncPanel() {
 
   return (
     <div className="bg-white rounded-xl border border-[#EEECE5] p-5 space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Brand switcher */}
         <div>
           <label className="text-xs font-medium text-[#57544E] mb-1.5 block">Brand</label>
@@ -190,6 +205,21 @@ export function LiveSyncPanel() {
               />
             </PopoverContent>
           </Popover>
+        </div>
+
+        {/* Currency — a real conversion done by the API, not a cosmetic swap */}
+        <div>
+          <label className="text-xs font-medium text-[#57544E] mb-1.5 block">Currency</label>
+          <Select value={syncCurrency} onValueChange={(v) => setSyncCurrency(v as CurrencyCode)}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CURRENCIES.map(c => (
+                <SelectItem key={c.code} value={c.code}>{c.symbol} {c.code}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Optional discount product list */}
