@@ -8,6 +8,7 @@ export function ProductAnalysisPanel() {
   const {
     metaFile, shopifyFile, googleFile,
     mergedData, aggregatedProducts, allMonths, selectedMonths,
+    dataSource, syncStatus,
   } = useApp();
 
   // Always use aggregatedProducts — it's already month-filtered and per-product
@@ -34,11 +35,23 @@ export function ProductAnalysisPanel() {
       })()
     : '—';
 
-  const files = [
-    { key: 'meta',    label: 'Meta Ads',   stored: metaFile   },
-    { key: 'shopify', label: 'Shopify',    stored: shopifyFile },
-    { key: 'google',  label: 'Google Ads', stored: googleFile  },
-  ];
+  // Live Sync never produces File objects (it fetches JSON over HTTP), so the
+  // metaFile/shopifyFile/googleFile heuristic below only applies to the
+  // upload flow — for Live Sync, read real row counts from the same
+  // /api/live-status payload the sync panel's own status line already uses.
+  const isLive = dataSource === 'live';
+  const files = isLive
+    ? [
+        { key: 'meta',    label: 'Meta Ads',   rows: syncStatus?.meta?.productRows ?? 0,    connected: !!syncStatus?.meta?.connected },
+        { key: 'shopify', label: 'Shopify',    rows: syncStatus?.shopify?.orderItems ?? 0,  connected: !!syncStatus?.shopify?.connected },
+        { key: 'google',  label: 'Google Ads', rows: syncStatus?.google?.productRows ?? 0,  connected: !!syncStatus?.google?.connected },
+      ]
+    : [
+        { key: 'meta',    label: 'Meta Ads',   rows: metaFile    ? Math.round(metaFile.size / 40)    : 0, connected: !!metaFile    },
+        { key: 'shopify', label: 'Shopify',    rows: shopifyFile ? Math.round(shopifyFile.size / 40) : 0, connected: !!shopifyFile },
+        { key: 'google',  label: 'Google Ads', rows: googleFile  ? Math.round(googleFile.size / 40)  : 0, connected: !!googleFile  },
+      ];
+  const connectedCount = files.filter(f => f.connected).length;
 
   const monthLabel = allMonths.length > 0
     ? (selectedMonths.size === allMonths.length
@@ -52,20 +65,15 @@ export function ProductAnalysisPanel() {
         <div className="space-y-1">
           <PanelRow label="Run ID"   value={runId} mono />
           <PanelRow label="Products" value={String(count)} />
-          <PanelRow label="Sources"  value={`${files.filter(f => f.stored).length} files`} />
+          <PanelRow label="Sources"  value={isLive ? `${connectedCount} connected` : `${connectedCount} files`} />
           {monthLabel && <PanelRow label="Months" value={monthLabel} />}
         </div>
         <div className="mt-4">
           <div className="text-[10px] font-semibold text-[#8B8780] uppercase tracking-widest mb-2">
             Sources merged
           </div>
-          {files.map(({ key, label, stored }) => (
-            <SourceItem
-              key={key}
-              name={label}
-              rows={stored ? Math.round(stored.size / 40) : 0}
-              connected={!!stored}
-            />
+          {files.map(({ key, label, rows, connected }) => (
+            <SourceItem key={key} name={label} rows={rows} connected={connected} />
           ))}
         </div>
       </PanelSection>

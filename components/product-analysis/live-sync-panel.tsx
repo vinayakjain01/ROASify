@@ -152,6 +152,7 @@ export function LiveSyncPanel() {
 
   const metaStatus    = syncStatus?.meta;
   const shopifyStatus = syncStatus?.shopify;
+  const googleStatus  = syncStatus?.google;
   const hasNoData = !!syncStatus &&
     !(metaStatus?.connected && metaStatus?.productRows > 0) &&
     !(shopifyStatus?.connected && shopifyStatus?.orderItems > 0);
@@ -265,6 +266,15 @@ export function LiveSyncPanel() {
             Meta: <span className="font-medium text-[#1A1814]">{metaStatus?.productRows ?? 0} rows</span>
             <span className="text-[#DEDBD2]">·</span>
             Shopify: <span className="font-medium text-[#1A1814]">{shopifyStatus?.orderItems ?? 0} order items</span>
+            {/* Not every brand has a Google Ads account connected (e.g. some
+                international storefronts) — only claim a row count when the
+                API itself reports the connection as live. */}
+            {googleStatus?.connected && (
+              <>
+                <span className="text-[#DEDBD2]">·</span>
+                Google: <span className="font-medium text-[#1A1814]">{googleStatus?.productRows ?? 0} rows</span>
+              </>
+            )}
             {metaStatus?.lastSyncedAt && (
               <>
                 <span className="text-[#DEDBD2]">·</span>
