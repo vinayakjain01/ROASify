@@ -35,6 +35,23 @@ def _shopify_row(product_id, title, variant_title, net_sales):
     }
 
 
+def _google_row(product_id, title, cost):
+    return {
+        "productId": product_id, "googleItemId": f"shopify_zz_{product_id}_999",
+        "productTitle": title, "monthLabel": MONTH,
+        "amountSpent": cost, "impressions": 10, "clicks": 1, "conversions": 0,
+    }
+
+
+@pytest.fixture(autouse=True)
+def no_google_by_default():
+    """Every /api/analyse-live test gets a default empty Google response so
+    none of them depend on real env vars or make a live network call. Tests
+    that care about Google override this with their own patch.object call."""
+    with patch.object(main, "get_google_products", return_value=[]):
+        yield
+
+
 # ── /api/brands ──────────────────────────────────────────────────────────
 
 def test_api_brands_success():
@@ -109,7 +126,8 @@ def test_analyse_live_defaults_to_inr_and_passes_currency_through_to_fetchers():
     shopify_rows = [_shopify_row("1001", "Dress", "S", 5000)]
 
     with patch.object(main, "get_meta_products", return_value=meta_rows) as mock_meta, \
-         patch.object(main, "get_shopify_variants", return_value=shopify_rows) as mock_shopify:
+         patch.object(main, "get_shopify_variants", return_value=shopify_rows) as mock_shopify, \
+         patch.object(main, "get_google_products", return_value=[]) as mock_google:
         resp = client.post("/api/analyse-live", data={
             "brandId": "b1", "from": "2026-04-01", "to": "2026-04-30", "currency": "USD",
         })
@@ -118,6 +136,7 @@ def test_analyse_live_defaults_to_inr_and_passes_currency_through_to_fetchers():
     assert resp.json()["currency"] == "USD"
     mock_meta.assert_called_once_with("b1", "2026-04-01", "2026-04-30", "USD")
     mock_shopify.assert_called_once_with("b1", "2026-04-01", "2026-04-30", "USD")
+    mock_google.assert_called_once_with("b1", "2026-04-01", "2026-04-30", "USD")
 
 
 def test_analyse_live_omitted_currency_defaults_to_inr_in_fetcher_calls():
@@ -125,13 +144,15 @@ def test_analyse_live_omitted_currency_defaults_to_inr_in_fetcher_calls():
     shopify_rows = [_shopify_row("1001", "Dress", "S", 5000)]
 
     with patch.object(main, "get_meta_products", return_value=meta_rows) as mock_meta, \
-         patch.object(main, "get_shopify_variants", return_value=shopify_rows) as mock_shopify:
+         patch.object(main, "get_shopify_variants", return_value=shopify_rows) as mock_shopify, \
+         patch.object(main, "get_google_products", return_value=[]) as mock_google:
         client.post("/api/analyse-live", data={
             "brandId": "b1", "from": "2026-04-01", "to": "2026-04-30",
         })
 
     mock_meta.assert_called_once_with("b1", "2026-04-01", "2026-04-30", "INR")
     mock_shopify.assert_called_once_with("b1", "2026-04-01", "2026-04-30", "INR")
+    mock_google.assert_called_once_with("b1", "2026-04-01", "2026-04-30", "INR")
 
 
 def test_analyse_live_fetch_failure_returns_friendly_message():
@@ -191,3 +212,82 @@ def test_analyse_live_with_optional_discount_file():
 def test_analyse_live_never_touches_the_existing_analyse_endpoint():
     """Sanity check that the two endpoints are genuinely independent handlers."""
     assert main.analyse is not main.analyse_live
+
+
+# ── /api/analyse-live — Google (best-effort) ───────────────────────────────
+
+def test_analyse_live_includes_google_data_when_available():
+    meta_rows    = [_meta_row("1001", "Dress", 1000)]
+    shopify_rows = [_shopify_row("1001", "Dress", "S", 5000)]
+    google_rows  = [_google_row("1001", "Dress", 200)]
+
+    with patch.object(main, "get_meta_products", return_value=meta_rows), \
+         patch.object(main, "get_shopify_variants", return_value=shopify_rows), \
+         patch.object(main, "get_google_products", return_value=google_rows):
+        resp = client.post("/api/analyse-live", data={
+            "brandId": "b1", "from": "2026-04-01", "to": "2026-04-30",
+        })
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["hasGoogle"] is True
+    assert body["kpis"]["totalGoogleCost"] == 200
+    assert body["kpis"]["totalSpend"] == 1200  # Meta 1000 + Google 200
+    assert body["summary"]["google_cost"] == 200
+    assert body["products"][0]["Google Cost"] == 200
+    assert body["warnings"] == []
+
+
+def test_analyse_live_google_failure_does_not_block_the_sync():
+    """A broken Google fetch must still return a successful Meta+Shopify sync,
+    never a 502 — this is the whole point of best-effort."""
+    meta_rows    = [_meta_row("1001", "Dress", 1000)]
+    shopify_rows = [_shopify_row("1001", "Dress", "S", 5000)]
+
+    with patch.object(main, "get_meta_products", return_value=meta_rows), \
+         patch.object(main, "get_shopify_variants", return_value=shopify_rows), \
+         patch.object(main, "get_google_products", side_effect=GrowifyOSError("google-products down")):
+        resp = client.post("/api/analyse-live", data={
+            "brandId": "b1", "from": "2026-04-01", "to": "2026-04-30",
+        })
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["hasGoogle"] is False
+    assert body["kpis"]["totalGoogleCost"] == 0
+    assert "google-products down" not in resp.text  # internal detail never leaks
+    assert any("Google" in w for w in body["warnings"])
+
+
+def test_analyse_live_google_unexpected_exception_also_does_not_block_the_sync():
+    """Broad by design — even a mapper crash on an unexpected response shape
+    must not take down an otherwise-working Meta+Shopify sync."""
+    meta_rows    = [_meta_row("1001", "Dress", 1000)]
+    shopify_rows = [_shopify_row("1001", "Dress", "S", 5000)]
+
+    with patch.object(main, "get_meta_products", return_value=meta_rows), \
+         patch.object(main, "get_shopify_variants", return_value=shopify_rows), \
+         patch.object(main, "get_google_products", return_value=[{"unexpected": "shape"}]):
+        resp = client.post("/api/analyse-live", data={
+            "brandId": "b1", "from": "2026-04-01", "to": "2026-04-30",
+        })
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["hasGoogle"] is False
+    assert any("Google" in w for w in body["warnings"])
+
+
+def test_analyse_live_empty_google_rows_is_not_treated_as_available():
+    meta_rows    = [_meta_row("1001", "Dress", 1000)]
+    shopify_rows = [_shopify_row("1001", "Dress", "S", 5000)]
+
+    with patch.object(main, "get_meta_products", return_value=meta_rows), \
+         patch.object(main, "get_shopify_variants", return_value=shopify_rows), \
+         patch.object(main, "get_google_products", return_value=[]):
+        resp = client.post("/api/analyse-live", data={
+            "brandId": "b1", "from": "2026-04-01", "to": "2026-04-30",
+        })
+
+    assert resp.status_code == 200
+    assert resp.json()["hasGoogle"] is False

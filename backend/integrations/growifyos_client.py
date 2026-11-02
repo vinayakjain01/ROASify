@@ -2,10 +2,10 @@
 # ║  growifyos_client.py — thin client for the GrowifyOS Live Sync API   ║
 # ╚══════════════════════════════════════════════════════════════════════╝
 #
-# Wraps the 4 read-only GrowifyOS endpoints (brands / status / meta-products /
-# shopify-variants). Callers never see pagination — the two data endpoints
-# are paginated internally and always return the full row set for the
-# requested range, or raise GrowifyOSError.
+# Wraps the read-only GrowifyOS endpoints (brands / status / meta-products /
+# shopify-variants / google-products). Callers never see pagination — the
+# data endpoints are paginated internally and always return the full row set
+# for the requested range, or raise GrowifyOSError.
 
 import os
 import requests
@@ -118,5 +118,12 @@ def get_shopify_variants(brand_id: str, date_from: str, date_to: str, currency: 
     # variant-level rows collapse to the same product-level totals.
     return _get_paginated(
         "/shopify-variants",
+        {"brandId": brand_id, "from": date_from, "to": date_to, "currency": currency},
+    )
+
+
+def get_google_products(brand_id: str, date_from: str, date_to: str, currency: str = "INR") -> list:
+    return _get_paginated(
+        "/google-products",
         {"brandId": brand_id, "from": date_from, "to": date_to, "currency": currency},
     )

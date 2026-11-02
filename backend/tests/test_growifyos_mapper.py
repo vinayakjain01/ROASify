@@ -6,8 +6,10 @@ contract. These are pure-function tests, no network/mocking needed.
 from integrations.growifyos_mapper import (
     META_COLUMNS,
     SHOPIFY_COLUMNS,
+    GOOGLE_COLUMNS,
     map_meta_products,
     map_shopify_variants,
+    map_google_products,
 )
 
 
@@ -190,3 +192,55 @@ def test_multiple_variants_of_same_product_all_kept_at_variant_grain():
     assert len(df) == 2
     assert set(df["Product variant title"]) == {"XS", "M"}
     assert df["Total sales"].sum() == 300
+
+
+# ── map_google_products ──────────────────────────────────────────────────
+
+def test_google_empty_rows_returns_empty_dataframe_with_correct_columns():
+    df = map_google_products([])
+    assert list(df.columns) == GOOGLE_COLUMNS
+    assert len(df) == 0
+
+
+def _google_row(**overrides):
+    row = {
+        "productId": "10084119675202",
+        "googleItemId": "shopify_zz_10084119675202_51314895323458",
+        "productTitle": "TIONNA IN YELLOW Custom / FULL SET",
+        "monthLabel": "2026-10-01 - 2026-10-31",
+        "amountSpent": 3.4,
+        "impressions": 14,
+        "clicks": 2,
+        "conversions": 0,
+        "conversionValue": 0,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_maps_google_fields_directly_no_id_parsing_needed():
+    """Unlike the CSV path's regex-parsed Product ID, the API already resolves
+    productId itself — the mapper must use it as-is."""
+    df = map_google_products([_google_row()])
+    assert list(df.columns) == GOOGLE_COLUMNS
+    row = df.iloc[0]
+    assert row["Product ID"] == "10084119675202"
+    assert row["Google Item ID"] == "shopify_zz_10084119675202_51314895323458"
+    assert row["Product Title"] == "TIONNA IN YELLOW Custom / FULL SET"
+    assert row["Month"] == "2026-10-01 - 2026-10-31"
+    assert row["Cost"] == 3.4
+    assert row["Conversions"] == 0
+
+
+def test_google_missing_numeric_fields_coerce_to_zero_not_error():
+    rows = [_google_row(amountSpent=None, conversions=None)]
+    df = map_google_products(rows)
+    row = df.iloc[0]
+    assert row["Cost"] == 0
+    assert row["Conversions"] == 0
+
+
+def test_google_missing_title_falls_back_to_unknown_product():
+    rows = [_google_row(productTitle=None)]
+    df = map_google_products(rows)
+    assert df.iloc[0]["Product Title"] == "Unknown Product"

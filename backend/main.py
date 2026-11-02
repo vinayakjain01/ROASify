@@ -11,8 +11,9 @@ from integrations.growifyos_client import (
     get_status,
     get_meta_products,
     get_shopify_variants,
+    get_google_products,
 )
-from integrations.growifyos_mapper import map_meta_products, map_shopify_variants
+from integrations.growifyos_mapper import map_meta_products, map_shopify_variants, map_google_products
 
 LIVE_UNAVAILABLE_MSG = "Live data unavailable — try again or use file upload"
 
@@ -223,6 +224,24 @@ async def analyse_live(
     if len(shopify_df) == 0:
         raise HTTPException(status_code=422, detail="No Shopify data for this brand/date range.")
 
+    # ── Google (optional, best-effort) — a Google-side hiccup must never take
+    #    down an otherwise-working Meta+Shopify sync, same tolerant posture as
+    #    the CSV flow's optional Google file upload ──────────────────────────
+    google_df    = None
+    google_warns = []
+    try:
+        google_rows = get_google_products(brandId, from_, to, currency)
+        google_df   = map_google_products(google_rows)
+        if google_df.empty:
+            google_df = None
+    except Exception as e:
+        # Deliberately broad — a Google-side failure (API error, or an
+        # unexpected response shape the mapper can't parse) must never take
+        # down an otherwise-working Meta+Shopify sync.
+        print(f"[growifyos] /api/analyse-live google-products failed: {e}", file=sys.stderr)
+        google_df    = None
+        google_warns = ["Google data unavailable for this sync — showing Meta + Shopify only."]
+
     # ── Discount list (optional) — parsed inline here rather than shared
     #    with /api/analyse, so that endpoint's code path is never touched ──
     discount_df    = None
@@ -242,9 +261,9 @@ async def analyse_live(
         except Exception as e:
             discount_warns = [f"Discount file skipped: {e}"]
 
-    # ── Run Overall View (Google not available in Live Sync yet) ────────
+    # ── Run Overall View ──────────────────────────────────────────────
     try:
-        merged_df, has_month = run_overall_view(meta_df, shopify_df, None)
+        merged_df, has_month = run_overall_view(meta_df, shopify_df, google_df)
     except Exception as e:
         tb = traceback.format_exc()
         raise HTTPException(status_code=500, detail=f"Merge error: {e}\n\n{tb}")
@@ -291,7 +310,7 @@ async def analyse_live(
     return {
         "ok":           True,
         "hasMonth":     has_month,
-        "hasGoogle":    False,
+        "hasGoogle":    google_df is not None,
         "products":     df_to_records(merged_df),
         "kpis":         kpis,
         "quadrants": {
@@ -303,7 +322,7 @@ async def analyse_live(
             "rvCut": _safe(product_result["rv_cut"]),
         },
         "discountData": discount_data,
-        "warnings":     discount_warns,
+        "warnings":     google_warns + discount_warns,
         "summary": {
             "products":    product_result["all"].to_dict(orient="records") if not product_result["all"].empty else [],
             "total_spend": kpis["totalSpend"],

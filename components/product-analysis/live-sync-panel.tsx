@@ -118,9 +118,10 @@ export function LiveSyncPanel() {
       const summary          = result.summary  ?? {};
       const warns: string[]  = result.warnings ?? [];
 
-      const calcTotalSpend = products.reduce((s, p) => s + Number(p['Total Spend']     ?? 0), 0);
-      const calcTotalRev   = products.reduce((s, p) => s + Number(p['Shopify Revenue'] ?? 0), 0);
-      const calcMetaSpend  = products.reduce((s, p) => s + Number(p['Meta Spend']      ?? 0), 0);
+      const calcTotalSpend  = products.reduce((s, p) => s + Number(p['Total Spend']     ?? 0), 0);
+      const calcTotalRev    = products.reduce((s, p) => s + Number(p['Shopify Revenue'] ?? 0), 0);
+      const calcMetaSpend   = products.reduce((s, p) => s + Number(p['Meta Spend']      ?? 0), 0);
+      const calcGoogleCost  = products.reduce((s, p) => s + Number(p['Google Cost']     ?? 0), 0);
 
       setMergedResult(products, {
         products:    summary.products    ?? products.length,
@@ -128,9 +129,9 @@ export function LiveSyncPanel() {
         total_rev:   summary.total_rev   || calcTotalRev,
         roi:         summary.roi         || (calcTotalSpend > 0 ? calcTotalRev / calcTotalSpend : 0),
         meta_spend:  summary.meta_spend  || calcMetaSpend,
-        google_cost: 0,
+        google_cost: summary.google_cost || calcGoogleCost,
         lpv:         0,
-      }, result.hasMonth ?? false, false, warns);
+      }, result.hasMonth ?? false, result.hasGoogle ?? false, warns);
 
       setMetaSpendNote(result.metaSpendNote ?? null);
 

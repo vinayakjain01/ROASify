@@ -19,6 +19,10 @@ SHOPIFY_COLUMNS = [
     "Product variant title", "Net items sold", "Total sales",
 ]
 
+GOOGLE_COLUMNS = [
+    "Product ID", "Google Item ID", "Product Title", "Month", "Cost", "Conversions",
+]
+
 
 def _split_meta_title(meta_product_id) -> str:
     # Meta rows encode title as "<id>, <Title>" — same format the CSV export
@@ -91,3 +95,23 @@ def map_shopify_variants(rows: list) -> pd.DataFrame:
         "Total sales": pd.to_numeric(df["netSales"], errors="coerce").fillna(0),
     })
     return out[SHOPIFY_COLUMNS].reset_index(drop=True)
+
+
+def map_google_products(rows: list) -> pd.DataFrame:
+    if not rows:
+        return pd.DataFrame(columns=GOOGLE_COLUMNS)
+
+    df = pd.DataFrame(rows)
+    out = pd.DataFrame({
+        "Product ID": df["productId"].astype(str),
+        # run_overall_view() requires this column on the Google df whenever one
+        # is passed in (it's aggregated with .agg({..., "Google Item ID": "first"})) —
+        # always carry it, unlike the CSV path's regex-parsed version, the API
+        # already resolves productId itself so there's no extraction to get wrong.
+        "Google Item ID": df["googleItemId"].astype(str) if "googleItemId" in df.columns else "",
+        "Product Title": df["productTitle"].fillna("Unknown Product") if "productTitle" in df.columns else "Unknown Product",
+        "Month": df["monthLabel"],
+        "Cost": pd.to_numeric(df["amountSpent"], errors="coerce").fillna(0),
+        "Conversions": pd.to_numeric(df["conversions"], errors="coerce").fillna(0) if "conversions" in df.columns else 0,
+    })
+    return out[GOOGLE_COLUMNS].reset_index(drop=True)

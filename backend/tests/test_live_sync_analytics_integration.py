@@ -11,7 +11,7 @@ If this file ever needs editing alongside analytics.py, that's a signal the
 "zero changes to the existing engine" contract for Live Sync has been broken.
 """
 from analytics import run_overall_view, run_product_analysis, run_discount_analysis
-from integrations.growifyos_mapper import map_meta_products, map_shopify_variants
+from integrations.growifyos_mapper import map_meta_products, map_shopify_variants, map_google_products
 
 
 def _meta_row(product_id, title, month_label, spend):
@@ -40,6 +40,19 @@ def _shopify_row(product_id, title, variant_title, month_label, net_sales, net_i
         "itemsReturned": 0,
         "netItemsSold": net_items,
         "netSales": net_sales,
+    }
+
+
+def _google_row(product_id, title, month_label, cost, conversions=0):
+    return {
+        "productId": product_id,
+        "googleItemId": f"shopify_zz_{product_id}_999",
+        "productTitle": title,
+        "monthLabel": month_label,
+        "amountSpent": cost,
+        "impressions": 0,
+        "clicks": 0,
+        "conversions": conversions,
     }
 
 
@@ -135,3 +148,36 @@ def test_run_discount_analysis_still_works_with_variant_level_shopify_rows():
     discounted_row = results_df[results_df["Category"] == "Discounted"].iloc[0]
     assert discounted_row["Spend"] == 1000
     assert discounted_row["Revenue"] == 1000
+
+
+def test_google_products_merge_into_total_spend_and_carry_google_item_id():
+    """The real run_overall_view() path with a live Google df attached —
+    Google Cost must add into Total Spend alongside Meta, and Google Item ID
+    (required by run_overall_view's own groupby) must survive the merge."""
+    meta_df    = map_meta_products([_meta_row("1001", "Dress", MONTH, 1000)])
+    shopify_df = map_shopify_variants([_shopify_row("1001", "Dress", "S", MONTH, 5000)])
+    google_df  = map_google_products([_google_row("1001", "Dress", MONTH, 200, conversions=3)])
+
+    merged, has_month = run_overall_view(meta_df, shopify_df, google_df)
+
+    assert has_month is True
+    row = merged[merged["Product ID"] == "1001"].iloc[0]
+    assert row["Meta Spend"] == 1000
+    assert row["Google Cost"] == 200
+    assert row["Total Spend"] == 1200
+    assert row["Shopify Revenue"] == 5000
+    assert row["Conversions"] == 3
+    assert row["Google Item ID"] == "shopify_zz_1001_999"
+
+
+def test_google_absent_behaves_exactly_as_before_zero_cost():
+    """Passing google_df=None (today's behavior) must be bit-for-bit
+    unchanged by adding Google support elsewhere in the pipeline."""
+    meta_df    = map_meta_products([_meta_row("1001", "Dress", MONTH, 1000)])
+    shopify_df = map_shopify_variants([_shopify_row("1001", "Dress", "S", MONTH, 5000)])
+
+    merged, _ = run_overall_view(meta_df, shopify_df, None)
+
+    row = merged[merged["Product ID"] == "1001"].iloc[0]
+    assert row["Google Cost"] == 0
+    assert row["Total Spend"] == 1000

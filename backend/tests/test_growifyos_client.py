@@ -235,3 +235,40 @@ def test_meta_products_request_includes_url_and_headers():
     assert args[0] == "https://example.invalid/api/v1/roasify/meta-products"
     assert kwargs["headers"] == {"x-api-key": "test-key-do-not-leak"}
     assert kwargs["timeout"] == gc.DEFAULT_TIMEOUT
+
+
+# ── /google-products ─────────────────────────────────────────────────────
+
+def test_google_products_sends_brand_and_date_range():
+    page = {"rows": [], "hasMore": False, "nextOffset": None}
+    with patch.object(gc.requests, "get", return_value=_resp(json_body=page)) as mock_get:
+        gc.get_google_products("brand-1", "2026-04-01", "2026-09-24")
+    args, kwargs = mock_get.call_args
+    assert args[0] == "https://example.invalid/api/v1/roasify/google-products"
+    params = kwargs["params"]
+    assert params["brandId"] == "brand-1"
+    assert params["from"] == "2026-04-01"
+    assert params["to"] == "2026-09-24"
+
+
+def test_google_products_defaults_to_inr_when_currency_not_given():
+    page = {"rows": [], "hasMore": False, "nextOffset": None}
+    with patch.object(gc.requests, "get", return_value=_resp(json_body=page)) as mock_get:
+        gc.get_google_products("brand-1", "2026-04-01", "2026-09-24")
+    assert mock_get.call_args.kwargs["params"]["currency"] == "INR"
+
+
+def test_google_products_passes_explicit_currency_through():
+    page = {"rows": [], "hasMore": False, "nextOffset": None}
+    with patch.object(gc.requests, "get", return_value=_resp(json_body=page)) as mock_get:
+        gc.get_google_products("brand-1", "2026-04-01", "2026-09-24", currency="USD")
+    assert mock_get.call_args.kwargs["params"]["currency"] == "USD"
+
+
+def test_google_products_paginates_like_other_endpoints():
+    page1 = {"rows": [{"id": 1}], "hasMore": True, "nextOffset": 1}
+    page2 = {"rows": [{"id": 2}], "hasMore": False, "nextOffset": None}
+    with patch.object(gc.requests, "get", side_effect=[_resp(json_body=page1), _resp(json_body=page2)]) as mock_get:
+        rows = gc.get_google_products("brand-1", "2026-04-01", "2026-09-24")
+    assert rows == [{"id": 1}, {"id": 2}]
+    assert mock_get.call_count == 2
