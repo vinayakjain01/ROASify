@@ -6,6 +6,8 @@
 # in data_cleaner.py already produce, so analytics.py needs zero changes to
 # consume Live Sync data.
 
+from typing import Dict
+
 import pandas as pd
 
 META_COLUMNS = [
@@ -115,3 +117,37 @@ def map_google_products(rows: list) -> pd.DataFrame:
         "Conversions": pd.to_numeric(df["conversions"], errors="coerce").fillna(0) if "conversions" in df.columns else 0,
     })
     return out[GOOGLE_COLUMNS].reset_index(drop=True)
+
+
+def summarize_google_totals(payload: dict) -> dict:
+    """Collapses /google-totals' one-row-per-month response into a single
+    account-level summary for the requested range. Not fed into analytics.py —
+    this is a separate, account-wide figure (total Google spend including
+    non-product campaigns), not a per-product row, so it never merges with
+    Meta/Shopify data the way map_google_products() does."""
+    rows = payload.get("rows") or []
+
+    total_spend = 0.0
+    total_conversion_value = 0.0
+    product_level_spend = 0.0
+    by_campaign_type: Dict[str, float] = {}
+
+    for r in rows:
+        total_spend            += float(r.get("amountSpent") or 0)
+        total_conversion_value += float(r.get("conversionValue") or 0)
+        product_level_spend    += float(r.get("productLevelSpend") or 0)
+        for campaign_type, amount in (r.get("byCampaignType") or {}).items():
+            by_campaign_type[campaign_type] = by_campaign_type.get(campaign_type, 0) + float(amount or 0)
+
+    # Weighted by actual spend across the range, not an average of the
+    # per-month percentages (a month with tiny spend shouldn't count as much
+    # as one with huge spend).
+    product_level_share_pct = (product_level_spend / total_spend * 100) if total_spend else 0.0
+
+    return {
+        "totalSpend": round(total_spend, 2),
+        "totalConversionValue": round(total_conversion_value, 2),
+        "productLevelSpend": round(product_level_spend, 2),
+        "productLevelSharePct": round(product_level_share_pct, 2),
+        "byCampaignType": {k: round(v, 2) for k, v in by_campaign_type.items()},
+    }

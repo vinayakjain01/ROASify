@@ -48,7 +48,8 @@ def no_google_by_default():
     """Every /api/analyse-live test gets a default empty Google response so
     none of them depend on real env vars or make a live network call. Tests
     that care about Google override this with their own patch.object call."""
-    with patch.object(main, "get_google_products", return_value=[]):
+    with patch.object(main, "get_google_products", return_value=[]), \
+         patch.object(main, "get_google_totals", return_value={"rows": []}):
         yield
 
 
@@ -111,6 +112,7 @@ def test_analyse_live_success_shape_matches_analyse_contract():
     assert set(body.keys()) == {
         "ok", "hasMonth", "hasGoogle", "products", "kpis", "quadrants",
         "discountData", "warnings", "summary", "metaSpendNote", "currency",
+        "googleTotals", "googleSpendNote",
     }
     assert body["ok"] is True
     assert body["hasGoogle"] is False
@@ -119,6 +121,9 @@ def test_analyse_live_success_shape_matches_analyse_contract():
     assert body["kpis"]["totalRevenue"] == 5000
     assert "catalog/product ads only" in body["metaSpendNote"]
     assert body["currency"] == "INR"  # default when not specified
+    # No google-totals data was returned (default fixture), so these stay null.
+    assert body["googleTotals"] is None
+    assert body["googleSpendNote"] is None
 
 
 def test_analyse_live_defaults_to_inr_and_passes_currency_through_to_fetchers():
@@ -291,3 +296,82 @@ def test_analyse_live_empty_google_rows_is_not_treated_as_available():
 
     assert resp.status_code == 200
     assert resp.json()["hasGoogle"] is False
+
+
+# ── /api/analyse-live — Google account-level totals (best-effort) ─────────
+
+_GOOGLE_TOTALS_PAYLOAD = {"rows": [{
+    "amountSpent": 113833.19, "conversionValue": 682136.73,
+    "productLevelSpend": 61273.02,
+    "byCampaignType": {"PERFORMANCE_MAX": 45639.46, "DEMAND_GEN": 37602.82, "SEARCH": 30590.91},
+}]}
+
+
+def test_analyse_live_includes_google_totals_when_available():
+    meta_rows    = [_meta_row("1001", "Dress", 1000)]
+    shopify_rows = [_shopify_row("1001", "Dress", "S", 5000)]
+
+    with patch.object(main, "get_meta_products", return_value=meta_rows), \
+         patch.object(main, "get_shopify_variants", return_value=shopify_rows), \
+         patch.object(main, "get_google_totals", return_value=_GOOGLE_TOTALS_PAYLOAD) as mock_totals:
+        resp = client.post("/api/analyse-live", data={
+            "brandId": "b1", "from": "2026-10-01", "to": "2026-10-31",
+        })
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["googleTotals"]["totalSpend"] == 113833.19
+    assert body["googleTotals"]["productLevelSharePct"] == round(61273.02 / 113833.19 * 100, 2)
+    assert body["googleSpendNote"] is not None
+    assert "account's full Google Ads spend" in body["googleSpendNote"]
+    assert body["kpis"]["totalGoogleSpendOverall"] == 113833.19
+    assert body["kpis"]["googleProductLevelSharePct"] == round(61273.02 / 113833.19 * 100, 2)
+    mock_totals.assert_called_once_with("b1", "2026-10-01", "2026-10-31", "INR")
+
+
+def test_analyse_live_google_totals_failure_does_not_block_the_sync():
+    meta_rows    = [_meta_row("1001", "Dress", 1000)]
+    shopify_rows = [_shopify_row("1001", "Dress", "S", 5000)]
+
+    with patch.object(main, "get_meta_products", return_value=meta_rows), \
+         patch.object(main, "get_shopify_variants", return_value=shopify_rows), \
+         patch.object(main, "get_google_totals", side_effect=GrowifyOSError("google-totals down")):
+        resp = client.post("/api/analyse-live", data={
+            "brandId": "b1", "from": "2026-04-01", "to": "2026-04-30",
+        })
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["googleTotals"] is None
+    assert body["googleSpendNote"] is None
+    assert "totalGoogleSpendOverall" not in body["kpis"]
+    assert "google-totals down" not in resp.text
+
+
+def test_analyse_live_google_totals_unexpected_exception_does_not_block_the_sync():
+    meta_rows    = [_meta_row("1001", "Dress", 1000)]
+    shopify_rows = [_shopify_row("1001", "Dress", "S", 5000)]
+
+    with patch.object(main, "get_meta_products", return_value=meta_rows), \
+         patch.object(main, "get_shopify_variants", return_value=shopify_rows), \
+         patch.object(main, "get_google_totals", return_value={"rows": "not-a-list"}):
+        resp = client.post("/api/analyse-live", data={
+            "brandId": "b1", "from": "2026-04-01", "to": "2026-04-30",
+        })
+
+    assert resp.status_code == 200
+    assert resp.json()["googleTotals"] is None
+
+
+def test_analyse_live_google_totals_currency_matches_sync_currency():
+    meta_rows    = [_meta_row("1001", "Dress", 1000)]
+    shopify_rows = [_shopify_row("1001", "Dress", "S", 5000)]
+
+    with patch.object(main, "get_meta_products", return_value=meta_rows), \
+         patch.object(main, "get_shopify_variants", return_value=shopify_rows), \
+         patch.object(main, "get_google_totals", return_value=_GOOGLE_TOTALS_PAYLOAD) as mock_totals:
+        client.post("/api/analyse-live", data={
+            "brandId": "b1", "from": "2026-10-01", "to": "2026-10-31", "currency": "USD",
+        })
+
+    mock_totals.assert_called_once_with("b1", "2026-10-01", "2026-10-31", "USD")

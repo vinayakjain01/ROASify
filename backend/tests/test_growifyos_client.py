@@ -272,3 +272,49 @@ def test_google_products_paginates_like_other_endpoints():
         rows = gc.get_google_products("brand-1", "2026-04-01", "2026-09-24")
     assert rows == [{"id": 1}, {"id": 2}]
     assert mock_get.call_count == 2
+
+
+# ── /google-totals ───────────────────────────────────────────────────────
+
+def test_google_totals_sends_brand_and_date_range_not_paginated():
+    payload = {"rows": [{"amountSpent": 100}]}
+    with patch.object(gc.requests, "get", return_value=_resp(json_body=payload)) as mock_get:
+        result = gc.get_google_totals("brand-1", "2026-04-01", "2026-09-24")
+    assert result == payload
+    assert mock_get.call_count == 1
+    args, kwargs = mock_get.call_args
+    assert args[0] == "https://example.invalid/api/v1/roasify/google-totals"
+    params = kwargs["params"]
+    assert params["brandId"] == "brand-1"
+    assert params["from"] == "2026-04-01"
+    assert params["to"] == "2026-09-24"
+    assert "limit" not in params and "offset" not in params
+
+
+def test_google_totals_defaults_to_inr_and_no_umbrella_param():
+    payload = {"rows": []}
+    with patch.object(gc.requests, "get", return_value=_resp(json_body=payload)) as mock_get:
+        gc.get_google_totals("brand-1", "2026-04-01", "2026-09-24")
+    params = mock_get.call_args.kwargs["params"]
+    assert params["currency"] == "INR"
+    assert "umbrella" not in params
+
+
+def test_google_totals_passes_explicit_currency_through():
+    payload = {"rows": []}
+    with patch.object(gc.requests, "get", return_value=_resp(json_body=payload)) as mock_get:
+        gc.get_google_totals("brand-1", "2026-04-01", "2026-09-24", currency="USD")
+    assert mock_get.call_args.kwargs["params"]["currency"] == "USD"
+
+
+def test_google_totals_sends_umbrella_param_only_when_true():
+    payload = {"rows": []}
+    with patch.object(gc.requests, "get", return_value=_resp(json_body=payload)) as mock_get:
+        gc.get_google_totals("brand-1", "2026-04-01", "2026-09-24", umbrella=True)
+    assert mock_get.call_args.kwargs["params"]["umbrella"] == "true"
+
+
+def test_google_totals_surfaces_400_message_same_as_other_endpoints():
+    with patch.object(gc.requests, "get", return_value=_resp(status_code=400, json_body={"message": "brandId is required"})):
+        with pytest.raises(gc.GrowifyOSError, match="brandId is required"):
+            gc.get_google_totals("", "2026-04-01", "2026-09-24")

@@ -53,7 +53,7 @@ export default function ProductAnalysisPage() {
     allMonths,
     selectedMonths,
     dataSource, setDataSource,
-    metaSpendNote,
+    metaSpendNote, googleOverall,
   } = useApp();
 
   const [loading,        setLoading]        = useState(false);
@@ -244,6 +244,12 @@ export default function ProductAnalysisPage() {
           {dataSource === 'live' && metaSpendNote && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-xs text-blue-700">
               ℹ️ {metaSpendNote}
+            </div>
+          )}
+
+          {dataSource === 'live' && googleOverall?.note && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-xs text-blue-700">
+              ℹ️ {googleOverall.note}
             </div>
           )}
 

@@ -10,6 +10,7 @@ from integrations.growifyos_mapper import (
     map_meta_products,
     map_shopify_variants,
     map_google_products,
+    summarize_google_totals,
 )
 
 
@@ -244,3 +245,67 @@ def test_google_missing_title_falls_back_to_unknown_product():
     rows = [_google_row(productTitle=None)]
     df = map_google_products(rows)
     assert df.iloc[0]["Product Title"] == "Unknown Product"
+
+
+# ── summarize_google_totals ─────────────────────────────────────────────
+
+def test_summarize_google_totals_empty_rows_returns_all_zeros():
+    summary = summarize_google_totals({"rows": []})
+    assert summary["totalSpend"] == 0
+    assert summary["totalConversionValue"] == 0
+    assert summary["productLevelSpend"] == 0
+    assert summary["productLevelSharePct"] == 0
+    assert summary["byCampaignType"] == {}
+
+
+def test_summarize_google_totals_missing_rows_key_returns_zeros_not_error():
+    assert summarize_google_totals({})["totalSpend"] == 0
+
+
+def test_summarize_google_totals_single_month():
+    payload = {"rows": [{
+        "amountSpent": 113833.19,
+        "conversionValue": 682136.73,
+        "productLevelSpend": 61273.02,
+        "byCampaignType": {"PERFORMANCE_MAX": 45639.46, "DEMAND_GEN": 37602.82, "SEARCH": 30590.91},
+    }]}
+    summary = summarize_google_totals(payload)
+    assert summary["totalSpend"] == 113833.19
+    assert summary["totalConversionValue"] == 682136.73
+    assert summary["productLevelSpend"] == 61273.02
+    assert summary["productLevelSharePct"] == round(61273.02 / 113833.19 * 100, 2)
+    assert summary["byCampaignType"] == {"PERFORMANCE_MAX": 45639.46, "DEMAND_GEN": 37602.82, "SEARCH": 30590.91}
+
+
+def test_summarize_google_totals_sums_across_months_and_weights_share_by_spend():
+    """productLevelSharePct must be weighted by actual spend, not an average
+    of each month's own percentage — a low-spend month shouldn't skew it."""
+    payload = {"rows": [
+        {"amountSpent": 100, "conversionValue": 500, "productLevelSpend": 100, "byCampaignType": {"SEARCH": 100}},
+        {"amountSpent": 900, "conversionValue": 4500, "productLevelSpend": 0, "byCampaignType": {"SEARCH": 900}},
+    ]}
+    summary = summarize_google_totals(payload)
+    assert summary["totalSpend"] == 1000
+    assert summary["totalConversionValue"] == 5000
+    assert summary["productLevelSpend"] == 100
+    # Naive average of (100%, 0%) would give 50% — correct weighted answer is 10%.
+    assert summary["productLevelSharePct"] == 10.0
+    assert summary["byCampaignType"] == {"SEARCH": 1000}
+
+
+def test_summarize_google_totals_merges_campaign_types_across_months():
+    payload = {"rows": [
+        {"amountSpent": 50, "conversionValue": 0, "productLevelSpend": 0, "byCampaignType": {"SEARCH": 30, "PERFORMANCE_MAX": 20}},
+        {"amountSpent": 50, "conversionValue": 0, "productLevelSpend": 0, "byCampaignType": {"SEARCH": 10, "DEMAND_GEN": 40}},
+    ]}
+    summary = summarize_google_totals(payload)
+    assert summary["byCampaignType"] == {"SEARCH": 40, "PERFORMANCE_MAX": 20, "DEMAND_GEN": 40}
+
+
+def test_summarize_google_totals_missing_optional_fields_coerce_to_zero():
+    payload = {"rows": [{"amountSpent": 100}]}  # no conversionValue, productLevelSpend, byCampaignType
+    summary = summarize_google_totals(payload)
+    assert summary["totalSpend"] == 100
+    assert summary["totalConversionValue"] == 0
+    assert summary["productLevelSpend"] == 0
+    assert summary["byCampaignType"] == {}

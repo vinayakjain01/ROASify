@@ -8,7 +8,7 @@ export function ProductAnalysisPanel() {
   const {
     metaFile, shopifyFile, googleFile,
     mergedData, aggregatedProducts, allMonths, selectedMonths,
-    dataSource, syncStatus,
+    dataSource, syncStatus, googleOverall,
   } = useApp();
 
   // Always use aggregatedProducts — it's already month-filtered and per-product
@@ -87,6 +87,22 @@ export function ProductAnalysisPanel() {
             <PanelRow label="Avg Revenue"       value={inr(avgRevenue)} />
             <PanelRow label="Avg ROI"           value={roi(overallRoi)} />
             <PanelRow label="Avg Units/Product" value={avgItems.toLocaleString('en-IN')} />
+          </div>
+        </PanelSection>
+      )}
+
+      {/* Account-wide Google figures — Search/Demand Gen included, unlike
+          "Avg Google Spend" above which is only the product-level slice
+          already folded into Shopping/PMax product spend. */}
+      {isLive && googleOverall && (
+        <PanelSection title="Google Ads — account total">
+          <div className="space-y-1">
+            <PanelRow label="Overall Google Spend" value={inr(googleOverall.totalSpend)} />
+            <PanelRow
+              label="Overall Google ROAS"
+              value={roi(googleOverall.totalSpend > 0 ? googleOverall.totalConversionValue / googleOverall.totalSpend : 0)}
+            />
+            <PanelRow label="Product-level share" value={`${googleOverall.productLevelSharePct.toFixed(1)}%`} />
           </div>
         </PanelSection>
       )}

@@ -194,6 +194,20 @@ interface AppState {
   // instead of allowing a free (and now incorrect) cosmetic override.
   syncedCurrency: CurrencyCode | null;
   setSyncedCurrency: (c: CurrencyCode | null) => void;
+
+  // Account-wide Google Ads totals (Search/Demand Gen included, not just the
+  // product-level spend already folded into `products`/"Google Cost") — a
+  // separate, informational figure from /google-totals. null whenever that
+  // fetch wasn't available (best-effort, same posture as Google per-product data).
+  googleOverall: GoogleOverall | null;
+  setGoogleOverall: (g: GoogleOverall | null) => void;
+}
+
+export interface GoogleOverall {
+  totalSpend: number;
+  totalConversionValue: number;
+  productLevelSharePct: number;
+  note: string;
 }
 
 const CURRENCY_STORAGE_KEY = "roasify_currency";
@@ -246,6 +260,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [syncStatus, setSyncStatus]       = useState<any | null>(null);
   const [metaSpendNote, setMetaSpendNote] = useState<string | null>(null);
   const [syncedCurrency, setSyncedCurrency] = useState<CurrencyCode | null>(null);
+  const [googleOverall, setGoogleOverall] = useState<GoogleOverall | null>(null);
 
   const setSelectedBrand = useCallback((id: string | null) => {
     setSelectedBrandRaw(id);
@@ -385,6 +400,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       syncStatus, setSyncStatus,
       metaSpendNote, setMetaSpendNote,
       syncedCurrency, setSyncedCurrency,
+      googleOverall, setGoogleOverall,
     }}>
       {children}
     </AppContext.Provider>

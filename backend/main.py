@@ -12,8 +12,21 @@ from integrations.growifyos_client import (
     get_meta_products,
     get_shopify_variants,
     get_google_products,
+    get_google_totals,
 )
-from integrations.growifyos_mapper import map_meta_products, map_shopify_variants, map_google_products
+from integrations.growifyos_mapper import (
+    map_meta_products,
+    map_shopify_variants,
+    map_google_products,
+    summarize_google_totals,
+)
+
+GOOGLE_SPEND_NOTE = (
+    "Google Cost above reflects product-level (Shopping/Performance Max) spend "
+    "only — it will not match your account's full Google Ads spend, same caveat "
+    "as Meta spend. See Run Details for the full account total and how much of "
+    "it is product-level."
+)
 
 LIVE_UNAVAILABLE_MSG = "Live data unavailable — try again or use file upload"
 
@@ -242,6 +255,19 @@ async def analyse_live(
         google_df    = None
         google_warns = ["Google data unavailable for this sync — showing Meta + Shopify only."]
 
+    # ── Google account-level totals (optional, best-effort) — a separate,
+    #    informational figure: total Google spend INCLUDING non-product
+    #    campaigns (Search, Demand Gen), never merged into merged_df/analytics.
+    #    A failure here must not affect the sync's core data at all. ─────────
+    google_totals_summary = None
+    try:
+        google_totals_payload = get_google_totals(brandId, from_, to, currency)
+        if google_totals_payload.get("rows"):
+            google_totals_summary = summarize_google_totals(google_totals_payload)
+    except Exception as e:
+        print(f"[growifyos] /api/analyse-live google-totals failed: {e}", file=sys.stderr)
+        google_totals_summary = None
+
     # ── Discount list (optional) — parsed inline here rather than shared
     #    with /api/analyse, so that endpoint's code path is never touched ──
     discount_df    = None
@@ -306,6 +332,9 @@ async def analyse_live(
         "totalRevenue":    float(merged_df["Shopify Revenue"].sum()) if "Shopify Revenue" in merged_df.columns else 0,
     }
     kpis["overallRoi"] = kpis["totalRevenue"] / kpis["totalSpend"] if kpis["totalSpend"] else 0
+    if google_totals_summary:
+        kpis["totalGoogleSpendOverall"]    = google_totals_summary["totalSpend"]
+        kpis["googleProductLevelSharePct"] = google_totals_summary["productLevelSharePct"]
 
     return {
         "ok":           True,
@@ -323,6 +352,11 @@ async def analyse_live(
         },
         "discountData": discount_data,
         "warnings":     google_warns + discount_warns,
+        # Account-wide Google figures (Search/Demand Gen included) — separate
+        # from "Google Cost" above, which is product-level only. null when the
+        # /google-totals fetch failed, same best-effort posture as google_df.
+        "googleTotals":    google_totals_summary,
+        "googleSpendNote": GOOGLE_SPEND_NOTE if google_totals_summary else None,
         "summary": {
             "products":    product_result["all"].to_dict(orient="records") if not product_result["all"].empty else [],
             "total_spend": kpis["totalSpend"],

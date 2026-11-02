@@ -127,3 +127,12 @@ def get_google_products(brand_id: str, date_from: str, date_to: str, currency: s
         "/google-products",
         {"brandId": brand_id, "from": date_from, "to": date_to, "currency": currency},
     )
+
+
+def get_google_totals(brand_id: str, date_from: str, date_to: str, currency: str = "INR", umbrella: bool = False) -> dict:
+    # Account-level (not per-product) — one row per month, never thousands of
+    # rows like the other data endpoints, so no pagination needed here.
+    params = {"brandId": brand_id, "from": date_from, "to": date_to, "currency": currency}
+    if umbrella:
+        params["umbrella"] = "true"
+    return _get("/google-totals", params)
