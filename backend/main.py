@@ -3,7 +3,8 @@ import os, io, math, sys, traceback
 from fastapi import FastAPI, UploadFile, File, Form, Query, HTTPException, Depends # type: ignore
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
 import pandas as pd
-from auth import get_current_user, CurrentUser, ensure_brand_access, user_allowed_brand_ids
+from auth import get_current_user, CurrentUser, ensure_brand_access, user_allowed_brand_ids, require_admin
+import teams as teams_admin
 from data_cleaner import clean_meta, clean_shopify, clean_google
 from analytics import run_overall_view, run_product_analysis, run_discount_analysis
 from integrations.growifyos_client import (
@@ -198,6 +199,13 @@ def api_brands(user: CurrentUser = Depends(get_current_user)):
     except GrowifyOSError as e:
         print(f"[growifyos] /api/brands failed: {e}", file=sys.stderr)
         raise HTTPException(status_code=502, detail=LIVE_UNAVAILABLE_MSG)
+    # Picks up any brand whose name matches a pending team_brand_names entry
+    # — the moment a brand goes live on GrowifyOS, it shows up for its team
+    # automatically, without any admin action.
+    try:
+        teams_admin.sync_team_brands_from_live_list(brands)
+    except Exception as e:
+        print(f"[teams] brand-name auto-resolution failed: {e}", file=sys.stderr)
     allowed = user_allowed_brand_ids(user)
     if allowed is not None:
         allowed_set = set(allowed)
@@ -389,6 +397,87 @@ async def analyse_live(
 @app.get("/api/auth/me")
 def auth_me(user: CurrentUser = Depends(get_current_user)):
     return {"id": user.id, "email": user.email, "role": user.role, "teamId": user.team_id}
+
+
+# ── Admin — teams, users, brand access (all require role='admin') ──────────
+
+@app.get("/api/admin/teams")
+def admin_list_teams(user: CurrentUser = Depends(require_admin)):
+    return {"ok": True, "teams": teams_admin.list_teams()}
+
+
+@app.post("/api/admin/teams")
+def admin_create_team(payload: dict, user: CurrentUser = Depends(require_admin)):
+    name = str(payload.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Team name is required.")
+    return {"ok": True, "team": teams_admin.create_team(name)}
+
+
+@app.get("/api/admin/users")
+def admin_list_users(user: CurrentUser = Depends(require_admin)):
+    return {"ok": True, "users": teams_admin.list_users()}
+
+
+@app.patch("/api/admin/users/{user_id}")
+def admin_update_user(user_id: str, payload: dict, user: CurrentUser = Depends(require_admin)):
+    role = payload.get("role")
+    if role is not None and role not in ("admin", "member"):
+        raise HTTPException(status_code=422, detail="role must be 'admin' or 'member'.")
+    clear_team = "teamId" in payload and payload.get("teamId") is None
+    team_id = payload.get("teamId")
+    try:
+        updated = teams_admin.update_user(user_id, role=role, team_id=team_id, clear_team=clear_team)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return {"ok": True, "user": updated}
+
+
+@app.get("/api/admin/brand-names")
+def admin_list_brand_names(user: CurrentUser = Depends(require_admin)):
+    return {"ok": True, "brandNames": teams_admin.list_brand_names()}
+
+
+@app.post("/api/admin/brand-names")
+def admin_create_brand_name(payload: dict, user: CurrentUser = Depends(require_admin)):
+    brand_name = str(payload.get("brandName") or "").strip()
+    team_id = payload.get("teamId")
+    if not brand_name or not team_id:
+        raise HTTPException(status_code=422, detail="brandName and teamId are required.")
+    return {"ok": True, "entry": teams_admin.create_brand_name(brand_name, team_id)}
+
+
+@app.delete("/api/admin/brand-names/{entry_id}")
+def admin_delete_brand_name(entry_id: str, user: CurrentUser = Depends(require_admin)):
+    teams_admin.delete_brand_name(entry_id)
+    return {"ok": True}
+
+
+@app.get("/api/admin/brand-assignments")
+def admin_list_brand_assignments(user: CurrentUser = Depends(require_admin)):
+    try:
+        live_brands = get_brands()
+    except GrowifyOSError as e:
+        print(f"[growifyos] /api/admin/brand-assignments failed: {e}", file=sys.stderr)
+        raise HTTPException(status_code=502, detail=LIVE_UNAVAILABLE_MSG)
+    teams_admin.sync_team_brands_from_live_list(live_brands)
+    assignments = teams_admin.get_team_brand_assignments()
+    teams_by_id = {t["id"]: t["name"] for t in teams_admin.list_teams()}
+    result = []
+    for b in live_brands:
+        bid = b.get("brandId")
+        team_id = assignments.get(bid)
+        result.append({
+            "brandId": bid, "name": b.get("name"),
+            "teamId": team_id, "teamName": teams_by_id.get(team_id),
+        })
+    return {"ok": True, "brands": result}
+
+
+@app.put("/api/admin/brand-assignments/{brand_id}")
+def admin_set_brand_assignment(brand_id: str, payload: dict, user: CurrentUser = Depends(require_admin)):
+    teams_admin.set_brand_team(brand_id, payload.get("teamId"))
+    return {"ok": True}
 
 
 @app.get("/health")
