@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Upload, LayoutGrid, Tag, LogOut } from 'lucide-react';
+import { Upload, LayoutGrid, Tag, LogOut, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { fetchCurrentUser } from '@/lib/api';
 
 const navItems = [
   { href: '/product-analysis',  label: 'Product Analysis',  icon: Upload     },
@@ -17,9 +18,11 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+    fetchCurrentUser().then(u => setIsAdmin(u.role === 'admin')).catch(() => setIsAdmin(false));
   }, []);
 
   const handleSignOut = async () => {
@@ -69,6 +72,35 @@ export function Sidebar() {
             );
           })}
         </ul>
+
+        {isAdmin && (
+          <>
+            <div className="text-[10px] font-semibold text-[#6B6760] uppercase tracking-widest px-3 mt-5 mb-2">
+              Admin
+            </div>
+            <ul className="space-y-0.5">
+              {(() => {
+                const isActive = pathname === '/admin';
+                return (
+                  <li>
+                    <Link
+                      href="/admin"
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150',
+                        isActive
+                          ? 'bg-[#4F46E5]/15 text-white border border-[#4F46E5]/30'
+                          : 'text-[#A8A5A0] hover:bg-[#221F18] hover:text-[#E8E5E0]'
+                      )}
+                    >
+                      <ShieldCheck className={cn('w-4 h-4 flex-shrink-0', isActive ? 'text-[#4F46E5]' : '')} />
+                      Teams &amp; Access
+                    </Link>
+                  </li>
+                );
+              })()}
+            </ul>
+          </>
+        )}
       </nav>
 
       {/* Account */}
