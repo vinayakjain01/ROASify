@@ -77,7 +77,7 @@ static_sites:
         value: ""
         scope: BUILD_TIME
       - key: NODE_VERSION
-        value: "20"
+        value: "22"
         scope: BUILD_TIME
     routes:
       - path: /
