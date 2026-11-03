@@ -1,4 +1,16 @@
+import { supabase } from "./supabase";
+
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+// Attaches the current Supabase session token, if any, so the backend can
+// identify who's calling (required for /api/brands, /api/live-status,
+// /api/analyse-live — the other endpoints don't check it yet, but sending it
+// everywhere is harmless).
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export interface ProductRow {
   id?: string;
@@ -33,9 +45,10 @@ export interface AnalyseResponse {
 
 async function post(path: string, body: FormData | object) {
   const isForm = body instanceof FormData;
+  const auth = await authHeaders();
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: isForm ? undefined : { "Content-Type": "application/json" },
+    headers: isForm ? auth : { "Content-Type": "application/json", ...auth },
     body: isForm ? body : JSON.stringify(body),
   });
   if (!res.ok) {
@@ -46,7 +59,8 @@ async function post(path: string, body: FormData | object) {
 }
 
 async function get(path: string) {
-  const res = await fetch(`${BASE}${path}`);
+  const auth = await authHeaders();
+  const res = await fetch(`${BASE}${path}`, { headers: auth });
   if (!res.ok) {
     const text = await res.text();
     let message = text;

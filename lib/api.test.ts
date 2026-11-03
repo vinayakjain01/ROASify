@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchBrands, fetchLiveStatus, analyseLive, mergeFiles } from './api';
+import { supabase } from './supabase';
 
 function mockFetchOnce(status: number, body: any, ok = status >= 200 && status < 300) {
   return vi.fn().mockResolvedValue({
@@ -111,5 +112,61 @@ describe('analyseLive / mergeFiles — request construction', () => {
     expect((fd.get('meta_file') as File).name).toBe('meta.csv');
     expect((fd.get('shopify_file') as File).name).toBe('shopify.csv');
     expect(fd.get('google_file')).toBeNull();
+  });
+});
+
+describe('auth header — attaches the Supabase session token when present', () => {
+  const originalFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('sends an Authorization header on GET when a session exists', async () => {
+    vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
+      data: { session: { access_token: 'test-token-123' } as any },
+      error: null,
+    } as any);
+    let capturedHeaders: any;
+    global.fetch = vi.fn().mockImplementation((_url, init) => {
+      capturedHeaders = init.headers;
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true, brands: [] }) });
+    }) as any;
+
+    await fetchBrands();
+
+    expect(capturedHeaders.Authorization).toBe('Bearer test-token-123');
+  });
+
+  it('omits the Authorization header when there is no session', async () => {
+    vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
+      data: { session: null },
+      error: null,
+    } as any);
+    let capturedHeaders: any;
+    global.fetch = vi.fn().mockImplementation((_url, init) => {
+      capturedHeaders = init.headers;
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true, brands: [] }) });
+    }) as any;
+
+    await fetchBrands();
+
+    expect(capturedHeaders.Authorization).toBeUndefined();
+  });
+
+  it('sends an Authorization header on POST (FormData) when a session exists', async () => {
+    vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
+      data: { session: { access_token: 'test-token-456' } as any },
+      error: null,
+    } as any);
+    let capturedHeaders: any;
+    global.fetch = vi.fn().mockImplementation((_url, init) => {
+      capturedHeaders = init.headers;
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    }) as any;
+
+    await analyseLive('ridhi-mehra', '2026-04-01', '2026-09-24');
+
+    expect(capturedHeaders.Authorization).toBe('Bearer test-token-456');
   });
 });

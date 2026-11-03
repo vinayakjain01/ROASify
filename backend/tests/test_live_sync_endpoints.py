@@ -11,11 +11,25 @@ import pytest
 from fastapi.testclient import TestClient
 
 import main
+from auth import get_current_user, CurrentUser
 from integrations.growifyos_client import GrowifyOSError
 
 client = TestClient(main.app)
 
 MONTH = "2026-04-01 - 2026-04-30"
+
+ADMIN_USER  = CurrentUser(id="admin-1", email="admin@example.com", role="admin", team_id=None)
+
+
+@pytest.fixture(autouse=True)
+def default_to_admin_user():
+    """Every test in this file is authenticated as an admin by default (sees
+    every brand, unrestricted) — that's what all the existing tests here are
+    actually about: data flow, not the permission system. The permission
+    system itself gets its own dedicated tests below, overriding this."""
+    main.app.dependency_overrides[get_current_user] = lambda: ADMIN_USER
+    yield
+    main.app.dependency_overrides.pop(get_current_user, None)
 
 
 def _meta_row(product_id, title, spend):
@@ -375,3 +389,83 @@ def test_analyse_live_google_totals_currency_matches_sync_currency():
         })
 
     mock_totals.assert_called_once_with("b1", "2026-10-01", "2026-10-31", "USD")
+
+
+# ── Team-based brand access (authorization) ─────────────────────────────────
+#
+# These override the default_to_admin_user fixture for themselves, since
+# they're specifically testing what a non-admin, team-scoped user can and
+# can't do — the opposite of every test above this point.
+
+MEMBER_WITH_TEAM = CurrentUser(id="u1", email="member@example.com", role="member", team_id="team-1")
+MEMBER_NO_TEAM   = CurrentUser(id="u2", email="noteam@example.com",  role="member", team_id=None)
+
+_ALL_BRANDS = [
+    {"brandId": "ridhi-mehra", "name": "Ridhi Mehra"},
+    {"brandId": "rozapret",    "name": "Roza Pret"},
+]
+
+
+def _as(user):
+    main.app.dependency_overrides[get_current_user] = lambda: user
+    return client
+
+
+def test_api_brands_filters_to_members_team():
+    with patch.object(main, "get_brands", return_value=_ALL_BRANDS), \
+         patch("auth._get_team_brand_ids", return_value=["ridhi-mehra"]):
+        resp = _as(MEMBER_WITH_TEAM).get("/api/brands")
+    assert resp.status_code == 200
+    assert [b["brandId"] for b in resp.json()["brands"]] == ["ridhi-mehra"]
+
+
+def test_api_brands_admin_sees_everything_unfiltered():
+    with patch.object(main, "get_brands", return_value=_ALL_BRANDS):
+        resp = _as(ADMIN_USER).get("/api/brands")
+    assert resp.status_code == 200
+    assert len(resp.json()["brands"]) == 2
+
+
+def test_api_brands_member_with_no_team_sees_empty_list_not_error():
+    with patch.object(main, "get_brands", return_value=_ALL_BRANDS):
+        resp = _as(MEMBER_NO_TEAM).get("/api/brands")
+    assert resp.status_code == 200
+    assert resp.json()["brands"] == []
+
+
+def test_api_live_status_403_for_brand_outside_members_team():
+    with patch("auth._get_team_brand_ids", return_value=["ridhi-mehra"]):
+        resp = _as(MEMBER_WITH_TEAM).get("/api/live-status", params={"brandId": "rozapret"})
+    assert resp.status_code == 403
+
+
+def test_api_live_status_200_for_brand_within_members_team():
+    with patch("auth._get_team_brand_ids", return_value=["ridhi-mehra"]), \
+         patch.object(main, "get_status", return_value={"meta": {"connected": True}}):
+        resp = _as(MEMBER_WITH_TEAM).get("/api/live-status", params={"brandId": "ridhi-mehra"})
+    assert resp.status_code == 200
+
+
+def test_analyse_live_403_for_brand_outside_members_team():
+    with patch("auth._get_team_brand_ids", return_value=["ridhi-mehra"]):
+        resp = _as(MEMBER_WITH_TEAM).post("/api/analyse-live", data={
+            "brandId": "rozapret", "from": "2026-04-01", "to": "2026-04-30",
+        })
+    assert resp.status_code == 403
+    # Never even attempts the GrowifyOS fetch for a brand they can't access.
+
+
+def test_analyse_live_403_never_calls_growifyos_for_disallowed_brand():
+    meta_rows = [_meta_row("1001", "Dress", 1000)]
+    with patch("auth._get_team_brand_ids", return_value=["ridhi-mehra"]), \
+         patch.object(main, "get_meta_products", return_value=meta_rows) as mock_meta:
+        resp = _as(MEMBER_WITH_TEAM).post("/api/analyse-live", data={
+            "brandId": "rozapret", "from": "2026-04-01", "to": "2026-04-30",
+        })
+    assert resp.status_code == 403
+    mock_meta.assert_not_called()
+
+
+def test_member_with_no_team_gets_403_for_any_brand():
+    resp = _as(MEMBER_NO_TEAM).get("/api/live-status", params={"brandId": "ridhi-mehra"})
+    assert resp.status_code == 403

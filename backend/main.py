@@ -3,7 +3,7 @@ import os, io, math, sys, traceback
 from fastapi import FastAPI, UploadFile, File, Form, Query, HTTPException, Depends # type: ignore
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
 import pandas as pd
-from auth import get_current_user, CurrentUser
+from auth import get_current_user, CurrentUser, ensure_brand_access, user_allowed_brand_ids
 from data_cleaner import clean_meta, clean_shopify, clean_google
 from analytics import run_overall_view, run_product_analysis, run_discount_analysis
 from integrations.growifyos_client import (
@@ -192,17 +192,22 @@ async def analyse(
 
 
 @app.get("/api/brands")
-def api_brands():
+def api_brands(user: CurrentUser = Depends(get_current_user)):
     try:
         brands = get_brands()
     except GrowifyOSError as e:
         print(f"[growifyos] /api/brands failed: {e}", file=sys.stderr)
         raise HTTPException(status_code=502, detail=LIVE_UNAVAILABLE_MSG)
+    allowed = user_allowed_brand_ids(user)
+    if allowed is not None:
+        allowed_set = set(allowed)
+        brands = [b for b in brands if b.get("brandId") in allowed_set]
     return {"ok": True, "brands": brands}
 
 
 @app.get("/api/live-status")
-def api_live_status(brandId: str = Query(...)):
+def api_live_status(brandId: str = Query(...), user: CurrentUser = Depends(get_current_user)):
+    ensure_brand_access(user, brandId)
     try:
         status = get_status(brandId)
     except GrowifyOSError as e:
@@ -220,7 +225,9 @@ async def analyse_live(
     currency: str = Form("INR"),
     spend_pct_thresh: float = Form(100),
     rev_pct_thresh: float = Form(100),
+    user: CurrentUser = Depends(get_current_user),
 ):
+    ensure_brand_access(user, brandId)
     # ── Fetch + map live data (client raises GrowifyOSError on any failure,
     #    including a partial-page failure mid-pagination) ─────────────────
     try:

@@ -77,3 +77,27 @@ def require_admin(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required.")
     return user
+
+
+def _get_team_brand_ids(team_id: str) -> list[str]:
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("select brand_id from team_brands where team_id = %s", (team_id,))
+        return [r[0] for r in cur.fetchall()]
+
+
+def user_allowed_brand_ids(user: CurrentUser) -> list[str] | None:
+    """None means unrestricted (admin sees every GrowifyOS brand). Otherwise
+    the list of brandIds the user's team is allowed to see — empty if they
+    have no team assigned yet, not an error."""
+    if user.role == "admin":
+        return None
+    if not user.team_id:
+        return []
+    return _get_team_brand_ids(user.team_id)
+
+
+def ensure_brand_access(user: CurrentUser, brand_id: str) -> None:
+    allowed = user_allowed_brand_ids(user)
+    if allowed is not None and brand_id not in allowed:
+        raise HTTPException(status_code=403, detail="You don't have access to this brand.")
