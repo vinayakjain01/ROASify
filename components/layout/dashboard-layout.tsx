@@ -1,11 +1,13 @@
 'use client';
 
 import { ReactNode, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
 import { cn } from '@/lib/utils';
-import { PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, Loader2 } from 'lucide-react';
 import { getStore, setPanelOpen } from '@/lib/store';
+import { supabase } from '@/lib/supabase';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -15,13 +17,35 @@ interface DashboardLayoutProps {
   className?: string;
 }
 
-export function DashboardLayout({ 
-  children, 
-  breadcrumbs, 
+export function DashboardLayout({
+  children,
+  breadcrumbs,
   rightPanel,
   rightPanelTitle = 'Details',
-  className 
+  className
 }: DashboardLayoutProps) {
+  const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Every page using this layout requires a signed-in session — checked once
+  // here rather than per-page, and kept in sync if the session ends elsewhere
+  // (e.g. Sign out, or the token expiring) via onAuthStateChange.
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      if (!data.session) {
+        router.replace('/login');
+      } else {
+        setAuthChecked(true);
+      }
+    });
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) router.replace('/login');
+    });
+    return () => { cancelled = true; subscription.subscription.unsubscribe(); };
+  }, [router]);
+
   const [panelOpen, setPanelOpenLocal] = useState<boolean>(() => {
     return rightPanel ? getStore().panelOpen : false;
   });
@@ -46,6 +70,14 @@ export function DashboardLayout({
   }, [!!rightPanel]);
 
   const showPanel = !!rightPanel && panelOpen;
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-[#FAFAF8] flex items-center justify-center">
+        <Loader2 className="w-5 h-5 text-[#8B8780] animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FAFAF8]">

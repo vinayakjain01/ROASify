@@ -68,6 +68,14 @@ static_sites:
       - key: NEXT_PUBLIC_API_URL
         value: "${APP_URL}"
         scope: BUILD_TIME
+      # Supabase login — the publishable key is safe to expose (browser-side
+      # by design); set real values in the DigitalOcean dashboard.
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: ""
+        scope: BUILD_TIME
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        value: ""
+        scope: BUILD_TIME
       - key: NODE_VERSION
         value: "20"
         scope: BUILD_TIME

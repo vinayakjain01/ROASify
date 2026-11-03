@@ -1,9 +1,11 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Upload, LayoutGrid, Tag} from 'lucide-react';
+import { Upload, LayoutGrid, Tag, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 
 const navItems = [
   { href: '/product-analysis',  label: 'Product Analysis',  icon: Upload     },
@@ -13,6 +15,17 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [email, setEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.replace('/login');
+  };
 
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-60 bg-[#17150F] flex flex-col z-50">
@@ -57,6 +70,22 @@ export function Sidebar() {
           })}
         </ul>
       </nav>
+
+      {/* Account */}
+      <div className="px-3 py-3 border-t border-[#2A2620]">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg">
+          <span className="text-xs text-[#A8A5A0] truncate" title={email ?? undefined}>
+            {email ?? ' '}
+          </span>
+          <button
+            onClick={handleSignOut}
+            title="Sign out"
+            className="flex-shrink-0 p-1.5 rounded-md text-[#A8A5A0] hover:bg-[#221F18] hover:text-[#E8E5E0] transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
     </aside>
   );
 }
