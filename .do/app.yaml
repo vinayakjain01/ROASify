@@ -35,6 +35,24 @@ services:
       - key: GROWIFYOS_BASE_URL
         value: ""
         scope: RUN_TIME
+      # Supabase — team/user/brand-access data. Set real values in the
+      # DigitalOcean dashboard, never commit them here. Use the pooler
+      # connection string for DATABASE_URL (db.<ref>.supabase.co is
+      # IPv6-only and won't reach most App Platform regions).
+      - key: SUPABASE_URL
+        value: ""
+        scope: RUN_TIME
+      - key: SUPABASE_SECRET_KEY
+        value: ""
+        scope: RUN_TIME
+        type: SECRET
+      - key: SUPABASE_JWKS_URL
+        value: ""
+        scope: RUN_TIME
+      - key: DATABASE_URL
+        value: ""
+        scope: RUN_TIME
+        type: SECRET
     routes:
       - path: /api
       - path: /health

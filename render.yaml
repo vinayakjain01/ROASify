@@ -15,3 +15,13 @@ services:
         sync: false
       - key: GROWIFYOS_BASE_URL
         value: ""
+      # Supabase — team/user/brand-access data. Use the pooler connection
+      # string for DATABASE_URL (db.<ref>.supabase.co is IPv6-only).
+      - key: SUPABASE_URL
+        value: ""
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_JWKS_URL
+        value: ""
+      - key: DATABASE_URL
+        sync: false
