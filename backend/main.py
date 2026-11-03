@@ -1,8 +1,9 @@
 # backend/main.py
 import os, io, math, sys, traceback
-from fastapi import FastAPI, UploadFile, File, Form, Query, HTTPException # type: ignore
+from fastapi import FastAPI, UploadFile, File, Form, Query, HTTPException, Depends # type: ignore
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
 import pandas as pd
+from auth import get_current_user, CurrentUser
 from data_cleaner import clean_meta, clean_shopify, clean_google
 from analytics import run_overall_view, run_product_analysis, run_discount_analysis
 from integrations.growifyos_client import (
@@ -376,6 +377,11 @@ async def analyse_live(
         # frontend can lock its display symbol to it rather than guessing.
         "currency": currency,
     }
+
+
+@app.get("/api/auth/me")
+def auth_me(user: CurrentUser = Depends(get_current_user)):
+    return {"id": user.id, "email": user.email, "role": user.role, "teamId": user.team_id}
 
 
 @app.get("/health")
