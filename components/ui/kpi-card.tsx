@@ -55,6 +55,14 @@ export function KpiCard({
 
   const trend = delta ? (delta > 0 ? 'up' : 'down') : 'flat';
 
+  // Drives the value text's font-size (see the clamp() below): a longer
+  // formatted string gets a proportionally smaller "weight" divisor, so a
+  // short value (e.g. "2,775") is free to render near the 20px cap while a
+  // long one (e.g. "₹2,15,74,242") scales itself down to still fit — on top
+  // of the clamp's own dependence on @container width, which is what keeps
+  // either case from overflowing when the right panel narrows the card.
+  const kpiCharWeight = Math.max(formattedValue.length, 1) * 0.6;
+
   return (
     // `@container` makes the value text size respond to THIS card's own
     // rendered width — not the viewport's — so it shrinks automatically
@@ -76,9 +84,10 @@ export function KpiCard({
           <div
             className={cn(
               "font-semibold text-[#1A1814] tabular-nums leading-tight",
-              "text-[13px] @[130px]:text-[14px] @[160px]:text-[16px] @[190px]:text-[18px] @[220px]:text-[20px]",
+              "text-[clamp(12px,calc((100cqw_-_32px)/var(--kpi-w)),20px)]",
               "truncate whitespace-nowrap overflow-hidden"
             )}
+            style={{ ['--kpi-w' as any]: kpiCharWeight }}
           >
             {formattedValue}
           </div>
