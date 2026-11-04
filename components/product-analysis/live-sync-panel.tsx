@@ -193,7 +193,7 @@ export function LiveSyncPanel() {
     <div className="bg-white rounded-xl border border-[#EEECE5] p-5 space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Brand switcher */}
-        <div>
+        <div className="min-w-0">
           <label className="text-xs font-medium text-[#57544E] mb-1.5 block">Brand</label>
           <Select
             value={selectedBrand ?? undefined}
@@ -213,15 +213,17 @@ export function LiveSyncPanel() {
         </div>
 
         {/* Date range picker */}
-        <div>
+        <div className="min-w-0">
           <label className="text-xs font-medium text-[#57544E] mb-1.5 block">Date range</label>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full justify-start font-normal">
-                <CalendarDays className="w-4 h-4 mr-2 text-[#8B8780]" />
-                {dateRange.from && dateRange.to
-                  ? `${toISODate(dateRange.from)} → ${toISODate(dateRange.to)}`
-                  : 'Select range'}
+              <Button variant="outline" className="w-full min-w-0 justify-start font-normal overflow-hidden">
+                <CalendarDays className="w-4 h-4 mr-2 text-[#8B8780] flex-shrink-0" />
+                <span className="truncate">
+                  {dateRange.from && dateRange.to
+                    ? `${toISODate(dateRange.from)} → ${toISODate(dateRange.to)}`
+                    : 'Select range'}
+                </span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -238,7 +240,7 @@ export function LiveSyncPanel() {
         </div>
 
         {/* Currency — a real conversion done by the API, not a cosmetic swap */}
-        <div>
+        <div className="min-w-0">
           <label className="text-xs font-medium text-[#57544E] mb-1.5 block">Currency</label>
           <Select value={syncCurrency} onValueChange={(v) => setSyncCurrency(v as CurrencyCode)}>
             <SelectTrigger className="w-full">
@@ -253,7 +255,7 @@ export function LiveSyncPanel() {
         </div>
 
         {/* Optional discount product list */}
-        <div>
+        <div className="min-w-0">
           <label className="text-xs font-medium text-[#57544E] mb-1.5 block">Discount product list (optional)</label>
           <label className="flex items-center gap-2 border border-dashed border-[#DEDBD2] rounded-lg px-3 py-2 text-sm text-[#57544E] cursor-pointer hover:border-[#4F46E5] hover:bg-[#FAFAFF] transition-colors h-9">
             <Upload className="w-4 h-4 text-[#8B8780] flex-shrink-0" />

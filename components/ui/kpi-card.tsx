@@ -56,14 +56,19 @@ export function KpiCard({
   const trend = delta ? (delta > 0 ? 'up' : 'down') : 'flat';
 
   return (
+    // `@container` makes the value text size respond to THIS card's own
+    // rendered width — not the viewport's — so it shrinks automatically
+    // whenever the right panel takes space from it (and grows back when the
+    // panel closes), instead of relying on a viewport breakpoint that can't
+    // tell the two layouts apart.
     <div
   className={cn(
           "bg-white rounded-[10px] border border-[#EEECE5] shadow-sm",
-          "p-4 min-w-0 overflow-hidden",
+          "@container p-4 min-w-0 overflow-hidden",
           className
         )}
       >
-      <div className="text-[10px] font-medium text-[#8B8780] uppercase tracking-wide mb-0.5">
+      <div className="text-[10px] font-medium text-[#8B8780] uppercase tracking-wide mb-0.5 truncate">
         {label}
       </div>
       <div className="min-w-0 flex-1">
@@ -71,7 +76,7 @@ export function KpiCard({
           <div
             className={cn(
               "font-semibold text-[#1A1814] tabular-nums leading-tight",
-              "text-[16px] xl:text-[18px] 2xl:text-[20px]",
+              "text-[13px] @[130px]:text-[14px] @[160px]:text-[16px] @[190px]:text-[18px] @[220px]:text-[20px]",
               "truncate whitespace-nowrap overflow-hidden"
             )}
           >
@@ -87,7 +92,7 @@ export function KpiCard({
           )}
         </div>
         {showSparkline && (
-        <div className="hidden xl:block flex-shrink-0">
+        <div className="hidden @[200px]:block flex-shrink-0">
           <Sparkline trend={trend} />
         </div>
       )}
