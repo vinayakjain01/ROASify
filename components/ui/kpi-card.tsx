@@ -123,14 +123,25 @@ interface KpiStripProps {
   cards: KpiCardProps[];
   className?: string;
   fluid?: boolean;
+  // How many grid columns to lay the cards out in — defaults to 6 (Product
+  // Analysis's full strip). A strip with fewer cards (e.g. Quadrant View's 4)
+  // should pass its real count here, otherwise the grid still reserves 6
+  // tracks and each card ends up narrower than the row actually allows,
+  // which is what caused fixed-size (non-fluid) values to overflow.
+  columns?: 4 | 6;
 }
 
-export function KpiStrip({ cards, className, fluid = true }: KpiStripProps) {
+const COLUMNS_CLASS: Record<4 | 6, string> = {
+  4: "grid-cols-4",
+  6: "grid-cols-6",
+};
+
+export function KpiStrip({ cards, className, fluid = true, columns = 6 }: KpiStripProps) {
   return (
     <div
       className={cn(
         "grid gap-4",
-        "grid-cols-6",
+        COLUMNS_CLASS[columns],
         className
       )}
     >

@@ -79,7 +79,7 @@ export default function DiscountAnalysisPage() {
         </div>
       ) : (
         <>
-          <KpiStrip cards={kpiCards} className="mb-6" />
+          <KpiStrip cards={kpiCards} className="mb-6" columns={4} />
           <div className="mb-5"><DiscountHero discountedStats={dStats} nonDiscountedStats={ndStats} /></div>
           <div className="mb-5"><ComparisonCard discountedStats={dStats} nonDiscountedStats={ndStats} /></div>
           <div className="mb-5"><NarrativeCard discountedStats={dStats} nonDiscountedStats={ndStats} /></div>

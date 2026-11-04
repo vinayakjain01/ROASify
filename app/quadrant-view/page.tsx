@@ -161,7 +161,7 @@ export default function QuadrantViewPage() {
 
       {mergedData && (
         <>
-          <KpiStrip cards={kpiCards} className="mb-6" fluid={false} />
+          <KpiStrip cards={kpiCards} className="mb-6" fluid={false} columns={4} />
           <div className="mb-5">
             <ChampionsHero spendThreshold={spendThreshold} revenueThreshold={revenueThreshold} />
           </div>
