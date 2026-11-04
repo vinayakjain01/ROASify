@@ -9,10 +9,15 @@
 # (password hash format, required trigger-adjacent fields, etc.).
 
 import os
+import sys
 
 import requests
 
-DEFAULT_TIMEOUT = 15
+# Short on purpose: if Supabase's own email-sending is slow, we want OUR
+# clean error back to the client well before DigitalOcean's own gateway
+# gives up waiting on us and serves its raw "failed to forward" page instead
+# of our response.
+DEFAULT_TIMEOUT = 8
 
 
 class SupabaseAdminError(Exception):
@@ -32,6 +37,7 @@ def invite_user(email: str) -> dict:
     if not key:
         raise SupabaseAdminError("SUPABASE_SECRET_KEY is not configured on the server.")
 
+    print(f"[supabase_admin] POST {url.rstrip('/')}/auth/v1/invite starting…", file=sys.stderr)
     try:
         resp = requests.post(
             f"{url.rstrip('/')}/auth/v1/invite",
@@ -40,9 +46,12 @@ def invite_user(email: str) -> dict:
             timeout=DEFAULT_TIMEOUT,
         )
     except requests.exceptions.Timeout:
+        print("[supabase_admin] invite request timed out", file=sys.stderr)
         raise SupabaseAdminError("Supabase Auth timed out sending the invite.")
     except requests.exceptions.RequestException as e:
+        print(f"[supabase_admin] invite request failed: {e.__class__.__name__}: {e}", file=sys.stderr)
         raise SupabaseAdminError(f"Supabase Auth request failed ({e.__class__.__name__}).")
+    print(f"[supabase_admin] invite responded HTTP {resp.status_code}", file=sys.stderr)
 
     if resp.status_code >= 400:
         reason = None
