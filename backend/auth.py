@@ -24,6 +24,14 @@ _jwk_client: PyJWKClient | None = None
 # (possibly for an outside contractor on a different domain, which must keep
 # working). Checked via the JWT's own provider claim, not a DB lookup.
 GOOGLE_ALLOWED_EMAIL_DOMAIN = "growify.in"
+# A handful of specific addresses allowed in alongside the domain (e.g. a
+# shared company inbox that isn't on the growify.in domain itself).
+GOOGLE_ALLOWED_EXTRA_EMAILS = {"growify@gmail.com"}
+
+
+def _is_google_email_allowed(email: str) -> bool:
+    email = email.lower()
+    return email.endswith(f"@{GOOGLE_ALLOWED_EMAIL_DOMAIN}") or email in GOOGLE_ALLOWED_EXTRA_EMAILS
 
 
 def _get_jwk_client() -> PyJWKClient:
@@ -64,8 +72,8 @@ def get_current_user(authorization: str = Header(None)) -> CurrentUser:
         raise HTTPException(status_code=401, detail="Invalid or expired session.")
 
     provider = (claims.get("app_metadata") or {}).get("provider")
-    claimed_email = str(claims.get("email") or "").lower()
-    if provider == "google" and not claimed_email.endswith(f"@{GOOGLE_ALLOWED_EMAIL_DOMAIN}"):
+    claimed_email = str(claims.get("email") or "")
+    if provider == "google" and not _is_google_email_allowed(claimed_email):
         raise HTTPException(
             status_code=403,
             detail=f"Please log in with your @{GOOGLE_ALLOWED_EMAIL_DOMAIN} Google account.",

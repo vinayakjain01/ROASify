@@ -136,6 +136,39 @@ def test_google_signin_domain_check_is_case_insensitive():
     assert user.email == "Someone@Growify.In"
 
 
+def test_google_signin_allows_the_specific_extra_shared_email():
+    row = ("growify@gmail.com", "member", None)
+    with patch.object(auth, "_get_jwk_client") as mock_jwk, \
+         patch.object(auth.jwt, "decode", return_value=_google_claims("growify@gmail.com")), \
+         patch.object(auth, "get_conn", return_value=_mock_conn(row)):
+        mock_jwk.return_value.get_signing_key_from_jwt.return_value = MagicMock(key="fake-key")
+        user = auth.get_current_user(authorization="Bearer valid.token.here")  # must not raise
+    assert user.email == "growify@gmail.com"
+
+
+def test_google_signin_extra_email_allowlist_is_case_insensitive():
+    row = ("Growify@Gmail.com", "member", None)
+    with patch.object(auth, "_get_jwk_client") as mock_jwk, \
+         patch.object(auth.jwt, "decode", return_value=_google_claims("Growify@Gmail.com")), \
+         patch.object(auth, "get_conn", return_value=_mock_conn(row)):
+        mock_jwk.return_value.get_signing_key_from_jwt.return_value = MagicMock(key="fake-key")
+        user = auth.get_current_user(authorization="Bearer valid.token.here")  # must not raise
+    assert user.email == "Growify@Gmail.com"
+
+
+def test_google_signin_other_gmail_addresses_still_rejected():
+    """The extra-email allowlist is a specific address, not a free pass for
+    all of gmail.com."""
+    with patch.object(auth, "_get_jwk_client") as mock_jwk, \
+         patch.object(auth.jwt, "decode", return_value=_google_claims("notgrowify@gmail.com")), \
+         patch.object(auth, "get_conn") as mock_get_conn:
+        mock_jwk.return_value.get_signing_key_from_jwt.return_value = MagicMock(key="fake-key")
+        with pytest.raises(HTTPException) as exc:
+            auth.get_current_user(authorization="Bearer valid.token.here")
+    assert exc.value.status_code == 403
+    mock_get_conn.assert_not_called()
+
+
 def test_email_password_signin_any_domain_allowed_not_subject_to_google_gate():
     """An admin-provisioned email/password account (e.g. an outside
     contractor) must never be blocked by the Google-only domain gate."""
