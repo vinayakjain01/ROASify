@@ -49,6 +49,7 @@ def test_non_admin_rejected_by_real_require_admin_logic():
     ("get",    "/api/admin/users"),
     ("post",   "/api/admin/users"),
     ("patch",  "/api/admin/users/u1"),
+    ("delete", "/api/admin/users/other-user"),
     ("get",    "/api/admin/brand-names"),
     ("post",   "/api/admin/brand-names"),
     ("delete", "/api/admin/brand-names/id-1"),
@@ -146,6 +147,29 @@ def test_invite_user_already_registered_surfaces_the_reason_to_the_admin():
         resp = client.post("/api/admin/users", json={"email": "existing@example.com"})
     assert resp.status_code == 500
     assert "already registered" in resp.text.lower()
+
+
+def test_delete_user_success():
+    with patch.object(main, "delete_user") as mock_delete:
+        resp = client.delete("/api/admin/users/some-other-user-id")
+    assert resp.status_code == 200
+    mock_delete.assert_called_once_with("some-other-user-id")
+
+
+def test_delete_user_cannot_delete_own_account():
+    # ADMIN.id == "admin-1" — deleting that id as yourself must be rejected
+    # before ever calling Supabase, so an admin can't lock themselves out.
+    with patch.object(main, "delete_user") as mock_delete:
+        resp = client.delete("/api/admin/users/admin-1")
+    assert resp.status_code == 422
+    mock_delete.assert_not_called()
+
+
+def test_delete_user_failure_surfaces_the_reason():
+    with patch.object(main, "delete_user", side_effect=SupabaseAdminError("Could not delete user (HTTP 404) — User not found.")):
+        resp = client.delete("/api/admin/users/nonexistent")
+    assert resp.status_code == 500
+    assert "not found" in resp.text.lower()
 
 
 # ── Brand names (pending, by name) ──────────────────────────────────────

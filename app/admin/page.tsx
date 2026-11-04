@@ -13,7 +13,7 @@ import { Plus, Trash2, Loader2, CheckCircle2, Clock } from 'lucide-react';
 import {
   fetchCurrentUser,
   fetchAdminTeams, createAdminTeam,
-  fetchAdminUsers, updateAdminUser, inviteAdminUser,
+  fetchAdminUsers, updateAdminUser, inviteAdminUser, deleteAdminUser,
   fetchAdminBrandNames, createAdminBrandName, deleteAdminBrandName,
   fetchAdminBrandAssignments, setAdminBrandAssignment,
   type AdminTeam, type AdminUser, type AdminBrandName, type AdminBrandAssignment,
@@ -175,7 +175,9 @@ function UsersTab() {
   const [teams, setTeams] = useState<AdminTeam[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ownId, setOwnId] = useState<string | null>(null);
 
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
@@ -191,6 +193,21 @@ function UsersTab() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { fetchCurrentUser().then(u => setOwnId(u.id)).catch(() => {}); }, []);
+
+  const handleDelete = async (user: AdminUser) => {
+    if (!window.confirm(`Delete ${user.email}? They'll immediately lose access and have to be re-invited.`)) return;
+    setDeletingId(user.id);
+    setError(null);
+    try {
+      await deleteAdminUser(user.id);
+      load();
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to delete user.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleInvite = async () => {
     const email = inviteEmail.trim();
@@ -271,6 +288,7 @@ function UsersTab() {
               <th className="px-5 py-3 font-medium">Email</th>
               <th className="px-5 py-3 font-medium w-40">Role</th>
               <th className="px-5 py-3 font-medium w-56">Team</th>
+              <th className="px-5 py-3 font-medium w-12"></th>
             </tr>
           </thead>
           <tbody>
@@ -295,10 +313,22 @@ function UsersTab() {
                     placeholder="No team"
                   />
                 </td>
+                <td className="px-5 py-3 text-right">
+                  {u.id !== ownId && (
+                    <button
+                      onClick={() => handleDelete(u)}
+                      disabled={deletingId === u.id}
+                      className="p-1.5 rounded-md text-[#8B8780] hover:bg-red-50 hover:text-red-600 transition-colors"
+                      title="Delete user"
+                    >
+                      {deletingId === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
             {users.length === 0 && (
-              <tr><td colSpan={3} className="px-5 py-6 text-center text-sm text-[#8B8780]">No users yet.</td></tr>
+              <tr><td colSpan={4} className="px-5 py-6 text-center text-sm text-[#8B8780]">No users yet.</td></tr>
             )}
           </tbody>
         </table>

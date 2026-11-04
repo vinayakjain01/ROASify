@@ -78,3 +78,40 @@ def invite_user(email: str) -> dict:
         return resp.json()
     except ValueError:
         raise SupabaseAdminError("Supabase Auth returned a non-JSON response.")
+
+
+def delete_user(user_id: str) -> None:
+    """Deletes the user from Supabase Auth. Our `profiles` row for them
+    cascades away automatically (foreign key ON DELETE CASCADE) — nothing
+    else to clean up on our side."""
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_SECRET_KEY")
+    if not url:
+        raise SupabaseAdminError("SUPABASE_URL is not configured on the server.")
+    if not key:
+        raise SupabaseAdminError("SUPABASE_SECRET_KEY is not configured on the server.")
+
+    print(f"[supabase_admin] DELETE {url.rstrip('/')}/auth/v1/admin/users/{user_id} starting…", file=sys.stderr)
+    try:
+        resp = requests.delete(
+            f"{url.rstrip('/')}/auth/v1/admin/users/{user_id}",
+            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            timeout=DEFAULT_TIMEOUT,
+        )
+    except requests.exceptions.Timeout:
+        print("[supabase_admin] delete request timed out", file=sys.stderr)
+        raise SupabaseAdminError("Supabase Auth timed out deleting the user.")
+    except requests.exceptions.RequestException as e:
+        print(f"[supabase_admin] delete request failed: {e.__class__.__name__}: {e}", file=sys.stderr)
+        raise SupabaseAdminError(f"Supabase Auth request failed ({e.__class__.__name__}).")
+    print(f"[supabase_admin] delete responded HTTP {resp.status_code}", file=sys.stderr)
+
+    if resp.status_code >= 400:
+        reason = None
+        try:
+            body = resp.json()
+            reason = body.get("msg") or body.get("error_description") or body.get("message")
+        except ValueError:
+            pass
+        detail = f" — {reason}" if reason else ""
+        raise SupabaseAdminError(f"Could not delete user (HTTP {resp.status_code}){detail}.")

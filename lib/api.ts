@@ -257,6 +257,13 @@ export async function inviteAdminUser(email: string): Promise<void> {
   await adminRequest("POST", "/api/admin/users", { email });
 }
 
+// Deletes the login from Supabase Auth entirely (not a role/team change) —
+// their profile row disappears along with it. The backend refuses to let an
+// admin delete their own account.
+export async function deleteAdminUser(userId: string): Promise<void> {
+  await adminRequest("DELETE", `/api/admin/users/${encodeURIComponent(userId)}`);
+}
+
 export async function updateAdminUser(
   userId: string,
   patch: { role?: string; teamId?: string | null }

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware # type: ignore
 import pandas as pd
 from auth import get_current_user, CurrentUser, ensure_brand_access, user_allowed_brand_ids, require_admin
 import teams as teams_admin
-from supabase_admin import invite_user, SupabaseAdminError
+from supabase_admin import invite_user, delete_user, SupabaseAdminError
 from data_cleaner import clean_meta, clean_shopify, clean_google
 from analytics import run_overall_view, run_product_analysis, run_discount_analysis
 from integrations.growifyos_client import (
@@ -433,6 +433,18 @@ def admin_invite_user(payload: dict, user: CurrentUser = Depends(require_admin))
         invite_user(email)
     except SupabaseAdminError as e:
         print(f"[supabase] invite_user failed: {e}", file=sys.stderr)
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"ok": True}
+
+
+@app.delete("/api/admin/users/{user_id}")
+def admin_delete_user(user_id: str, user: CurrentUser = Depends(require_admin)):
+    if user_id == user.id:
+        raise HTTPException(status_code=422, detail="You can't delete your own account.")
+    try:
+        delete_user(user_id)
+    except SupabaseAdminError as e:
+        print(f"[supabase] delete_user failed: {e}", file=sys.stderr)
         raise HTTPException(status_code=500, detail=str(e))
     return {"ok": True}
 
