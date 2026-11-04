@@ -149,6 +149,24 @@ export async function fetchCurrentUser(): Promise<CurrentUser> {
   return get('/api/auth/me');
 }
 
+export interface TeamOption {
+  id: string;
+  name: string;
+}
+
+// Any logged-in user can call this (not admin-only like fetchAdminTeams) —
+// needed to populate the first-time team picker.
+export async function fetchTeams(): Promise<TeamOption[]> {
+  const result = await get('/api/teams');
+  return result.teams ?? [];
+}
+
+// Self-service, but only works once — the backend refuses if the caller's
+// team is already set, so this can never be used to switch teams later.
+export async function chooseTeam(teamId: string): Promise<void> {
+  await post('/api/auth/choose-team', { teamId });
+}
+
 export async function analyseLive(
   brandId: string,
   from: string,

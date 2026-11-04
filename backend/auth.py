@@ -18,6 +18,13 @@ from db import get_conn
 
 _jwk_client: PyJWKClient | None = None
 
+# Google sign-in is self-service (anyone can click it), so it's gated to the
+# company domain — unlike admin-created email/password accounts, which are
+# already trusted by virtue of an admin having deliberately created them
+# (possibly for an outside contractor on a different domain, which must keep
+# working). Checked via the JWT's own provider claim, not a DB lookup.
+GOOGLE_ALLOWED_EMAIL_DOMAIN = "growify.in"
+
 
 def _get_jwk_client() -> PyJWKClient:
     global _jwk_client
@@ -55,6 +62,14 @@ def get_current_user(authorization: str = Header(None)) -> CurrentUser:
         # Deliberately generic — never leak whether the token was expired,
         # malformed, or forged; all three just mean "not logged in."
         raise HTTPException(status_code=401, detail="Invalid or expired session.")
+
+    provider = (claims.get("app_metadata") or {}).get("provider")
+    claimed_email = str(claims.get("email") or "").lower()
+    if provider == "google" and not claimed_email.endswith(f"@{GOOGLE_ALLOWED_EMAIL_DOMAIN}"):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Please log in with your @{GOOGLE_ALLOWED_EMAIL_DOMAIN} Google account.",
+        )
 
     user_id = claims["sub"]
 

@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { PanelRightClose, PanelRightOpen, Loader2 } from 'lucide-react';
 import { getStore, setPanelOpen } from '@/lib/store';
 import { supabase } from '@/lib/supabase';
+import { fetchCurrentUser } from '@/lib/api';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -27,18 +28,30 @@ export function DashboardLayout({
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
 
-  // Every page using this layout requires a signed-in session — checked once
-  // here rather than per-page, and kept in sync if the session ends elsewhere
-  // (e.g. Sign out, or the token expiring) via onAuthStateChange.
+  // Every page using this layout requires a signed-in session AND, for a
+  // member (not admin), a team already chosen — checked once here rather
+  // than per-page, and kept in sync if the session ends elsewhere (e.g.
+  // Sign out, or the token expiring) via onAuthStateChange.
   useEffect(() => {
     let cancelled = false;
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (cancelled) return;
       if (!data.session) {
         router.replace('/login');
-      } else {
-        setAuthChecked(true);
+        return;
       }
+      try {
+        const me = await fetchCurrentUser();
+        if (cancelled) return;
+        if (me.role === 'member' && !me.teamId) {
+          router.replace('/choose-team');
+          return;
+        }
+      } catch {
+        // If /api/auth/me itself fails, fall through and let the page's own
+        // API calls surface the real error rather than guessing here.
+      }
+      if (!cancelled) setAuthChecked(true);
     });
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) router.replace('/login');

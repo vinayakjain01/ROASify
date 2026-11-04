@@ -404,6 +404,28 @@ def auth_me(user: CurrentUser = Depends(get_current_user)):
     return {"id": user.id, "email": user.email, "role": user.role, "teamId": user.team_id}
 
 
+@app.get("/api/teams")
+def api_teams(user: CurrentUser = Depends(get_current_user)):
+    """Any logged-in user — not admin-only like /api/admin/teams — since a
+    member with no team yet needs this list to choose from."""
+    return {"ok": True, "teams": teams_admin.list_teams()}
+
+
+@app.post("/api/auth/choose-team")
+def choose_team(payload: dict, user: CurrentUser = Depends(get_current_user)):
+    """Self-service, but only once — set_own_team_if_unset() refuses if
+    team_id is already set, so this can never be used to switch teams later;
+    only an admin's PATCH /api/admin/users/{id} can change it after that."""
+    team_id = str(payload.get("teamId") or "").strip()
+    if not team_id:
+        raise HTTPException(status_code=422, detail="teamId is required.")
+    try:
+        updated = teams_admin.set_own_team_if_unset(user.id, team_id)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return {"ok": True, "user": updated}
+
+
 # ── Admin — teams, users, brand access (all require role='admin') ──────────
 
 @app.get("/api/admin/teams")

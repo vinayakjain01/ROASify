@@ -95,6 +95,74 @@ def test_profile_with_null_team_id_returns_none_not_string_none():
     assert user.team_id is None
 
 
+# ── get_current_user: Google sign-in domain restriction ─────────────────
+
+def _google_claims(email):
+    return {
+        "sub": "user-123", "exp": 9999999999, "email": email,
+        "app_metadata": {"provider": "google", "providers": ["google"]},
+    }
+
+
+def test_google_signin_wrong_domain_rejected_before_touching_db():
+    with patch.object(auth, "_get_jwk_client") as mock_jwk, \
+         patch.object(auth.jwt, "decode", return_value=_google_claims("someone@gmail.com")), \
+         patch.object(auth, "get_conn") as mock_get_conn:
+        mock_jwk.return_value.get_signing_key_from_jwt.return_value = MagicMock(key="fake-key")
+        with pytest.raises(HTTPException) as exc:
+            auth.get_current_user(authorization="Bearer valid.token.here")
+    assert exc.value.status_code == 403
+    assert "growify.in" in exc.value.detail
+    mock_get_conn.assert_not_called()
+
+
+def test_google_signin_correct_domain_allowed():
+    row = ("someone@growify.in", "member", None)
+    with patch.object(auth, "_get_jwk_client") as mock_jwk, \
+         patch.object(auth.jwt, "decode", return_value=_google_claims("someone@growify.in")), \
+         patch.object(auth, "get_conn", return_value=_mock_conn(row)):
+        mock_jwk.return_value.get_signing_key_from_jwt.return_value = MagicMock(key="fake-key")
+        user = auth.get_current_user(authorization="Bearer valid.token.here")
+    assert user.email == "someone@growify.in"
+
+
+def test_google_signin_domain_check_is_case_insensitive():
+    row = ("Someone@Growify.In", "member", None)
+    with patch.object(auth, "_get_jwk_client") as mock_jwk, \
+         patch.object(auth.jwt, "decode", return_value=_google_claims("Someone@Growify.In")), \
+         patch.object(auth, "get_conn", return_value=_mock_conn(row)):
+        mock_jwk.return_value.get_signing_key_from_jwt.return_value = MagicMock(key="fake-key")
+        user = auth.get_current_user(authorization="Bearer valid.token.here")  # must not raise
+    assert user.email == "Someone@Growify.In"
+
+
+def test_email_password_signin_any_domain_allowed_not_subject_to_google_gate():
+    """An admin-provisioned email/password account (e.g. an outside
+    contractor) must never be blocked by the Google-only domain gate."""
+    row = ("contractor@othercompany.com", "member", None)
+    claims = {
+        "sub": "user-123", "exp": 9999999999, "email": "contractor@othercompany.com",
+        "app_metadata": {"provider": "email", "providers": ["email"]},
+    }
+    with patch.object(auth, "_get_jwk_client") as mock_jwk, \
+         patch.object(auth.jwt, "decode", return_value=claims), \
+         patch.object(auth, "get_conn", return_value=_mock_conn(row)):
+        mock_jwk.return_value.get_signing_key_from_jwt.return_value = MagicMock(key="fake-key")
+        user = auth.get_current_user(authorization="Bearer valid.token.here")  # must not raise
+    assert user.email == "contractor@othercompany.com"
+
+
+def test_missing_app_metadata_does_not_crash_and_is_not_treated_as_google():
+    row = ("someone@example.com", "member", None)
+    claims = {"sub": "user-123", "exp": 9999999999, "email": "someone@example.com"}
+    with patch.object(auth, "_get_jwk_client") as mock_jwk, \
+         patch.object(auth.jwt, "decode", return_value=claims), \
+         patch.object(auth, "get_conn", return_value=_mock_conn(row)):
+        mock_jwk.return_value.get_signing_key_from_jwt.return_value = MagicMock(key="fake-key")
+        user = auth.get_current_user(authorization="Bearer valid.token.here")  # must not raise
+    assert user.email == "someone@example.com"
+
+
 def test_jwt_decode_called_with_both_signing_algorithms_and_authenticated_audience():
     row = ("someone@example.com", "admin", "team-abc")
     with patch.object(auth, "_get_jwk_client") as mock_jwk, \

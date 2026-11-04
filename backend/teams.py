@@ -53,6 +53,28 @@ def list_teams() -> list:
         return [{"id": str(r[0]), "name": r[1]} for r in cur.fetchall()]
 
 
+def set_own_team_if_unset(user_id: str, team_id: str) -> dict:
+    """Lets a member pick their own team exactly once — the WHERE clause
+    makes this atomic (no separate check-then-set race), and it's the only
+    path that can ever change a member's team without going through the
+    admin-only update_user(). Once team_id is set, this always fails,
+    forcing any future change through an admin."""
+    with get_conn() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """update profiles set team_id = %s where id = %s and team_id is null
+                   returning id, email, role, team_id""",
+                (team_id, user_id),
+            )
+        except Exception:
+            raise ValueError("That team doesn't exist.")
+        row = cur.fetchone()
+        if row is None:
+            raise ValueError("Your team is already set — ask an admin to change it.")
+        return {"id": str(row[0]), "email": row[1], "role": row[2], "teamId": str(row[3])}
+
+
 def create_team(name: str) -> dict:
     with get_conn() as conn:
         cur = conn.cursor()

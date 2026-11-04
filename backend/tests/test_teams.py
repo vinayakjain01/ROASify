@@ -100,6 +100,37 @@ def test_create_team_returns_new_id_and_name():
     assert result == {"id": "new-id", "name": "Team 5"}
 
 
+# ── set_own_team_if_unset ────────────────────────────────────────────────
+
+def test_set_own_team_if_unset_succeeds_when_team_was_null():
+    cur = MagicMock()
+    cur.fetchone.return_value = ("u1", "a@example.com", "member", "t2")
+    with patch.object(teams_admin, "get_conn", return_value=_mock_conn(cur)):
+        result = teams_admin.set_own_team_if_unset("u1", "t2")
+    assert result == {"id": "u1", "email": "a@example.com", "role": "member", "teamId": "t2"}
+    sql = cur.execute.call_args.args[0]
+    assert "team_id is null" in sql
+
+
+def test_set_own_team_if_unset_raises_when_already_set():
+    """The WHERE team_id is null clause matches no row once a team is
+    already set — fetchone() then returns None, same as if the user didn't
+    exist, which is exactly the atomic 'can't switch later' guarantee."""
+    cur = MagicMock()
+    cur.fetchone.return_value = None
+    with patch.object(teams_admin, "get_conn", return_value=_mock_conn(cur)):
+        with pytest.raises(ValueError, match="already set"):
+            teams_admin.set_own_team_if_unset("u1", "t2")
+
+
+def test_set_own_team_if_unset_raises_cleanly_for_invalid_team_id():
+    cur = MagicMock()
+    cur.execute.side_effect = Exception("foreign key violation")
+    with patch.object(teams_admin, "get_conn", return_value=_mock_conn(cur)):
+        with pytest.raises(ValueError, match="doesn't exist"):
+            teams_admin.set_own_team_if_unset("u1", "not-a-real-team-id")
+
+
 # ── Users ────────────────────────────────────────────────────────────────
 
 def test_list_users_includes_team_name_via_join():
