@@ -157,8 +157,9 @@ def test_google_signin_extra_email_allowlist_is_case_insensitive():
 
 
 def test_google_signin_other_gmail_addresses_still_rejected():
-    """The extra-email allowlist is a specific address, not a free pass for
-    all of gmail.com."""
+    """notgrowify@gmail.com ends with the substring "growify@gmail.com" but
+    has no dot boundary before it — must NOT match, or anyone could register
+    <whatever>growify@gmail.com to get in."""
     with patch.object(auth, "_get_jwk_client") as mock_jwk, \
          patch.object(auth.jwt, "decode", return_value=_google_claims("notgrowify@gmail.com")), \
          patch.object(auth, "get_conn") as mock_get_conn:
@@ -166,6 +167,42 @@ def test_google_signin_other_gmail_addresses_still_rejected():
         with pytest.raises(HTTPException) as exc:
             auth.get_current_user(authorization="Bearer valid.token.here")
     assert exc.value.status_code == 403
+    mock_get_conn.assert_not_called()
+
+
+def test_google_signin_allows_dot_prefixed_growify_gmail_addresses():
+    """The company's actual convention: name.growify@gmail.com, as used by
+    e.g. vinayak.growify@gmail.com."""
+    row = ("vinayak.growify@gmail.com", "member", None)
+    with patch.object(auth, "_get_jwk_client") as mock_jwk, \
+         patch.object(auth.jwt, "decode", return_value=_google_claims("vinayak.growify@gmail.com")), \
+         patch.object(auth, "get_conn", return_value=_mock_conn(row)):
+        mock_jwk.return_value.get_signing_key_from_jwt.return_value = MagicMock(key="fake-key")
+        user = auth.get_current_user(authorization="Bearer valid.token.here")  # must not raise
+    assert user.email == "vinayak.growify@gmail.com"
+
+
+def test_google_signin_allows_any_dot_prefixed_growify_gmail_address():
+    row = ("yuvraj.growify@gmail.com", "member", None)
+    with patch.object(auth, "_get_jwk_client") as mock_jwk, \
+         patch.object(auth.jwt, "decode", return_value=_google_claims("yuvraj.growify@gmail.com")), \
+         patch.object(auth, "get_conn", return_value=_mock_conn(row)):
+        mock_jwk.return_value.get_signing_key_from_jwt.return_value = MagicMock(key="fake-key")
+        user = auth.get_current_user(authorization="Bearer valid.token.here")  # must not raise
+    assert user.email == "yuvraj.growify@gmail.com"
+
+
+def test_google_signin_rejects_dot_prefixed_notgrowify():
+    """A dot before "notgrowify" doesn't make it "growify" — the local part
+    right before @gmail.com must be exactly "growify"."""
+    with patch.object(auth, "_get_jwk_client") as mock_jwk, \
+         patch.object(auth.jwt, "decode", return_value=_google_claims("x.notgrowify@gmail.com")), \
+         patch.object(auth, "get_conn") as mock_get_conn:
+        mock_jwk.return_value.get_signing_key_from_jwt.return_value = MagicMock(key="fake-key")
+        with pytest.raises(HTTPException) as exc:
+            auth.get_current_user(authorization="Bearer valid.token.here")
+    assert exc.value.status_code == 403
+    mock_get_conn.assert_not_called()
     mock_get_conn.assert_not_called()
 
 

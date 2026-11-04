@@ -8,15 +8,17 @@ import { supabase } from '@/lib/supabase';
 import { fetchCurrentUser } from '@/lib/api';
 
 const GOOGLE_ALLOWED_DOMAIN = 'growify.in';
-// A handful of specific addresses allowed in alongside the domain (e.g. a
-// shared company inbox that isn't on the growify.in domain itself). Keep in
-// sync with backend/auth.py's GOOGLE_ALLOWED_EXTRA_EMAILS — this check is
-// just for a fast, friendly UX; the backend enforces it regardless.
-const GOOGLE_ALLOWED_EXTRA_EMAILS = ['growify@gmail.com'];
+// Also allow the company's shared Gmail-based convention: growify@gmail.com
+// itself, or anyone.growify@gmail.com (dot-separated prefix before
+// "growify", not just any address containing that substring —
+// "notgrowify@gmail.com" must NOT match). Keep in sync with backend/auth.py's
+// GOOGLE_GROWIFY_GMAIL_PATTERN — this check is just for a fast, friendly UX;
+// the backend enforces it regardless.
+const GOOGLE_GROWIFY_GMAIL_PATTERN = /^([a-z0-9._%+-]+\.)?growify@gmail\.com$/;
 
 function isGoogleEmailAllowed(email: string): boolean {
   const e = email.toLowerCase();
-  return e.endsWith(`@${GOOGLE_ALLOWED_DOMAIN}`) || GOOGLE_ALLOWED_EXTRA_EMAILS.includes(e);
+  return e.endsWith(`@${GOOGLE_ALLOWED_DOMAIN}`) || GOOGLE_GROWIFY_GMAIL_PATTERN.test(e);
 }
 
 function GoogleIcon() {
