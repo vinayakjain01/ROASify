@@ -25,3 +25,7 @@ services:
         value: ""
       - key: DATABASE_URL
         sync: false
+      # Where to send invited users to set their password — the real
+      # frontend host, not this backend's own URL.
+      - key: FRONTEND_URL
+        value: "https://roa-sify.vercel.app"

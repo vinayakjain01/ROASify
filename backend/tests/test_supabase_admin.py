@@ -14,6 +14,7 @@ import supabase_admin as sa
 def env(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "https://example.invalid")
     monkeypatch.setenv("SUPABASE_SECRET_KEY", "test-secret-do-not-leak")
+    monkeypatch.setenv("FRONTEND_URL", "https://app.example.invalid")
 
 
 def _resp(status_code=200, json_body=None, json_raises=False):
@@ -42,6 +43,14 @@ def test_missing_secret_key_raises_before_any_request(monkeypatch):
         mock_post.assert_not_called()
 
 
+def test_missing_frontend_url_raises_before_any_request(monkeypatch):
+    monkeypatch.delenv("FRONTEND_URL", raising=False)
+    with patch.object(sa.requests, "post") as mock_post:
+        with pytest.raises(sa.SupabaseAdminError, match="FRONTEND_URL"):
+            sa.invite_user("a@example.com")
+        mock_post.assert_not_called()
+
+
 def test_successful_invite_returns_response_body():
     with patch.object(sa.requests, "post", return_value=_resp(200, {"id": "u1", "email": "a@example.com"})):
         result = sa.invite_user("a@example.com")
@@ -57,6 +66,13 @@ def test_invite_sends_correct_url_headers_and_body():
     assert kwargs["headers"]["Authorization"] == "Bearer test-secret-do-not-leak"
     assert kwargs["json"] == {"email": "a@example.com"}
     assert kwargs["timeout"] == sa.DEFAULT_TIMEOUT
+
+
+def test_invite_passes_redirect_to_pointing_at_accept_invite_page():
+    with patch.object(sa.requests, "post", return_value=_resp(200, {})) as mock_post:
+        sa.invite_user("a@example.com")
+    kwargs = mock_post.call_args.kwargs
+    assert kwargs["params"] == {"redirect_to": "https://app.example.invalid/accept-invite"}
 
 
 def test_already_registered_surfaces_message():

@@ -53,6 +53,11 @@ services:
         value: ""
         scope: RUN_TIME
         type: SECRET
+      # Where to send invited users to set their password — the REAL
+      # frontend host (Vercel), not this DigitalOcean app's own URL.
+      - key: FRONTEND_URL
+        value: "https://roa-sify.vercel.app"
+        scope: RUN_TIME
     routes:
       - path: /api
       - path: /health
