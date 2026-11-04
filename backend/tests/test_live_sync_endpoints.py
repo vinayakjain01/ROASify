@@ -81,7 +81,7 @@ def test_api_brands_success():
 def test_api_brands_failure_returns_friendly_message_not_raw_error():
     with patch.object(main, "get_brands", side_effect=GrowifyOSError("secret internal detail")):
         resp = client.get("/api/brands")
-    assert resp.status_code == 502
+    assert resp.status_code == 500
     assert resp.json()["detail"] == main.LIVE_UNAVAILABLE_MSG
     assert "secret internal detail" not in resp.text
 
@@ -104,7 +104,7 @@ def test_api_live_status_requires_brand_id():
 def test_api_live_status_failure_returns_friendly_message():
     with patch.object(main, "get_status", side_effect=GrowifyOSError("brand not allowed")):
         resp = client.get("/api/live-status", params={"brandId": "nope"})
-    assert resp.status_code == 502
+    assert resp.status_code == 500
     assert resp.json()["detail"] == main.LIVE_UNAVAILABLE_MSG
 
 
@@ -179,7 +179,7 @@ def test_analyse_live_fetch_failure_returns_friendly_message():
         resp = client.post("/api/analyse-live", data={
             "brandId": "b1", "from": "2026-04-01", "to": "2026-04-30",
         })
-    assert resp.status_code == 502
+    assert resp.status_code == 500
     assert resp.json()["detail"] == main.LIVE_UNAVAILABLE_MSG
     assert "brand not allowed" not in resp.text
 

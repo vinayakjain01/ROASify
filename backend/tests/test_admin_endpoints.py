@@ -144,7 +144,7 @@ def test_invite_user_success():
 def test_invite_user_already_registered_surfaces_the_reason_to_the_admin():
     with patch.object(main, "invite_user", side_effect=SupabaseAdminError("Could not invite user (HTTP 422) — User already registered.")):
         resp = client.post("/api/admin/users", json={"email": "existing@example.com"})
-    assert resp.status_code == 502
+    assert resp.status_code == 500
     assert "already registered" in resp.text.lower()
 
 
@@ -198,7 +198,7 @@ def test_list_brand_assignments_merges_live_list_with_current_assignments():
 def test_list_brand_assignments_growifyos_failure_returns_friendly_message():
     with patch.object(main, "get_brands", side_effect=GrowifyOSError("boom")):
         resp = client.get("/api/admin/brand-assignments")
-    assert resp.status_code == 502
+    assert resp.status_code == 500
     assert "boom" not in resp.text
 
 

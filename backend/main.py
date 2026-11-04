@@ -199,7 +199,11 @@ def api_brands(user: CurrentUser = Depends(get_current_user)):
         brands = get_brands()
     except GrowifyOSError as e:
         print(f"[growifyos] /api/brands failed: {e}", file=sys.stderr)
-        raise HTTPException(status_code=502, detail=LIVE_UNAVAILABLE_MSG)
+        # 500, not 502/503/504 — DigitalOcean's gateway (and many others)
+        # intercepts those codes as "the platform itself is broken" and
+        # replaces the body with its own generic error page, hiding this
+        # message from the client entirely. 500 is passed through as-is.
+        raise HTTPException(status_code=500, detail=LIVE_UNAVAILABLE_MSG)
     # Picks up any brand whose name matches a pending team_brand_names entry
     # — the moment a brand goes live on GrowifyOS, it shows up for its team
     # automatically, without any admin action.
@@ -221,7 +225,7 @@ def api_live_status(brandId: str = Query(...), user: CurrentUser = Depends(get_c
         status = get_status(brandId)
     except GrowifyOSError as e:
         print(f"[growifyos] /api/live-status failed: {e}", file=sys.stderr)
-        raise HTTPException(status_code=502, detail=LIVE_UNAVAILABLE_MSG)
+        raise HTTPException(status_code=500, detail=LIVE_UNAVAILABLE_MSG)
     return {"ok": True, "status": status}
 
 
@@ -244,7 +248,7 @@ async def analyse_live(
         shopify_rows = get_shopify_variants(brandId, from_, to, currency)
     except GrowifyOSError as e:
         print(f"[growifyos] /api/analyse-live failed: {e}", file=sys.stderr)
-        raise HTTPException(status_code=502, detail=LIVE_UNAVAILABLE_MSG)
+        raise HTTPException(status_code=500, detail=LIVE_UNAVAILABLE_MSG)
 
     meta_df    = map_meta_products(meta_rows)
     shopify_df = map_shopify_variants(shopify_rows)
@@ -429,7 +433,7 @@ def admin_invite_user(payload: dict, user: CurrentUser = Depends(require_admin))
         invite_user(email)
     except SupabaseAdminError as e:
         print(f"[supabase] invite_user failed: {e}", file=sys.stderr)
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
     return {"ok": True}
 
 
@@ -473,7 +477,7 @@ def admin_list_brand_assignments(user: CurrentUser = Depends(require_admin)):
         live_brands = get_brands()
     except GrowifyOSError as e:
         print(f"[growifyos] /api/admin/brand-assignments failed: {e}", file=sys.stderr)
-        raise HTTPException(status_code=502, detail=LIVE_UNAVAILABLE_MSG)
+        raise HTTPException(status_code=500, detail=LIVE_UNAVAILABLE_MSG)
     teams_admin.sync_team_brands_from_live_list(live_brands)
     assignments = teams_admin.get_team_brand_assignments()
     teams_by_id = {t["id"]: t["name"] for t in teams_admin.list_teams()}
