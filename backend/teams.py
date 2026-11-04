@@ -9,6 +9,21 @@
 from db import get_conn
 
 
+def ensure_profile_exists(user_id: str, email: str) -> None:
+    """Backstop for the on_auth_user_created trigger, which turns out not to
+    fire reliably for users created via Supabase's /invite API (it does fire
+    for users added through the Supabase dashboard) — confirmed by a real
+    invited user whose auth.users row existed with no matching profiles row.
+    Called right after every successful invite so this can't happen silently
+    again, regardless of whether the trigger ever gets fixed upstream."""
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "insert into profiles (id, email) values (%s, %s) on conflict (id) do nothing",
+            (user_id, email),
+        )
+
+
 def sync_team_brands_from_live_list(live_brands: list) -> None:
     """For every live GrowifyOS brand whose name matches a team_brand_names
     entry, ensure team_brands has that (team_id, brandId) row. Called every

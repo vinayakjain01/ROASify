@@ -19,6 +19,18 @@ def _mock_conn(cur: MagicMock):
     return ctx
 
 
+# ── ensure_profile_exists ────────────────────────────────────────────────
+
+def test_ensure_profile_exists_inserts_with_on_conflict_do_nothing():
+    cur = MagicMock()
+    with patch.object(teams_admin, "get_conn", return_value=_mock_conn(cur)):
+        teams_admin.ensure_profile_exists("u1", "a@example.com")
+    sql, params = cur.execute.call_args.args
+    assert "insert into profiles" in sql
+    assert "on conflict (id) do nothing" in sql
+    assert params == ("u1", "a@example.com")
+
+
 # ── sync_team_brands_from_live_list ─────────────────────────────────────
 
 def test_sync_matches_live_brand_to_team_by_name_case_insensitive():

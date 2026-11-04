@@ -430,10 +430,19 @@ def admin_invite_user(payload: dict, user: CurrentUser = Depends(require_admin))
     if not email:
         raise HTTPException(status_code=422, detail="Email is required.")
     try:
-        invite_user(email)
+        created = invite_user(email)
     except SupabaseAdminError as e:
         print(f"[supabase] invite_user failed: {e}", file=sys.stderr)
         raise HTTPException(status_code=500, detail=str(e))
+    # Don't rely on the on_auth_user_created trigger alone — confirmed it
+    # doesn't fire for API-invited users, which left a real invited account
+    # invisible (and undeletable) in the admin UI with no profiles row at all.
+    new_id = created.get("id")
+    if new_id:
+        try:
+            teams_admin.ensure_profile_exists(new_id, email)
+        except Exception as e:
+            print(f"[teams] ensure_profile_exists failed for new invite {email}: {e}", file=sys.stderr)
     return {"ok": True}
 
 

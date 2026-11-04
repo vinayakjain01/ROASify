@@ -136,10 +136,12 @@ def test_invite_user_requires_email():
 
 
 def test_invite_user_success():
-    with patch.object(main, "invite_user", return_value={"id": "u2"}) as mock_invite:
+    with patch.object(main, "invite_user", return_value={"id": "u2"}) as mock_invite, \
+         patch.object(main.teams_admin, "ensure_profile_exists") as mock_ensure:
         resp = client.post("/api/admin/users", json={"email": "new@example.com"})
     assert resp.status_code == 200
     mock_invite.assert_called_once_with("new@example.com")
+    mock_ensure.assert_called_once_with("u2", "new@example.com")
 
 
 def test_invite_user_already_registered_surfaces_the_reason_to_the_admin():
@@ -147,6 +149,34 @@ def test_invite_user_already_registered_surfaces_the_reason_to_the_admin():
         resp = client.post("/api/admin/users", json={"email": "existing@example.com"})
     assert resp.status_code == 500
     assert "already registered" in resp.text.lower()
+
+
+def test_invite_user_backstops_profile_creation_not_relying_on_trigger_alone():
+    """Confirmed via a real invited user that on_auth_user_created doesn't
+    always fire for API-invited accounts — this is the fix: ensure the
+    profiles row directly rather than trusting the trigger alone."""
+    with patch.object(main, "invite_user", return_value={"id": "u3", "email": "new2@example.com"}), \
+         patch.object(main.teams_admin, "ensure_profile_exists") as mock_ensure:
+        resp = client.post("/api/admin/users", json={"email": "new2@example.com"})
+    assert resp.status_code == 200
+    mock_ensure.assert_called_once_with("u3", "new2@example.com")
+
+
+def test_invite_user_missing_id_in_response_does_not_crash():
+    with patch.object(main, "invite_user", return_value={}), \
+         patch.object(main.teams_admin, "ensure_profile_exists") as mock_ensure:
+        resp = client.post("/api/admin/users", json={"email": "new@example.com"})
+    assert resp.status_code == 200
+    mock_ensure.assert_not_called()
+
+
+def test_invite_user_ensure_profile_failure_does_not_block_the_invite_response():
+    """The invite itself (real email already sent) must still report success
+    even if the defensive profile-backfill hits a transient DB error."""
+    with patch.object(main, "invite_user", return_value={"id": "u4"}), \
+         patch.object(main.teams_admin, "ensure_profile_exists", side_effect=Exception("db hiccup")):
+        resp = client.post("/api/admin/users", json={"email": "new@example.com"})
+    assert resp.status_code == 200
 
 
 def test_delete_user_success():
