@@ -250,6 +250,13 @@ export async function fetchAdminUsers(): Promise<AdminUser[]> {
   return r.users ?? [];
 }
 
+// Creates the login in Supabase Auth and emails them a link to set their own
+// password. Their profile (role='member', no team) appears automatically —
+// assign role/team afterward via updateAdminUser.
+export async function inviteAdminUser(email: string): Promise<void> {
+  await adminRequest("POST", "/api/admin/users", { email });
+}
+
 export async function updateAdminUser(
   userId: string,
   patch: { role?: string; teamId?: string | null }

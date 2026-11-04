@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware # type: ignore
 import pandas as pd
 from auth import get_current_user, CurrentUser, ensure_brand_access, user_allowed_brand_ids, require_admin
 import teams as teams_admin
+from supabase_admin import invite_user, SupabaseAdminError
 from data_cleaner import clean_meta, clean_shopify, clean_google
 from analytics import run_overall_view, run_product_analysis, run_discount_analysis
 from integrations.growifyos_client import (
@@ -417,6 +418,19 @@ def admin_create_team(payload: dict, user: CurrentUser = Depends(require_admin))
 @app.get("/api/admin/users")
 def admin_list_users(user: CurrentUser = Depends(require_admin)):
     return {"ok": True, "users": teams_admin.list_users()}
+
+
+@app.post("/api/admin/users")
+def admin_invite_user(payload: dict, user: CurrentUser = Depends(require_admin)):
+    email = str(payload.get("email") or "").strip()
+    if not email:
+        raise HTTPException(status_code=422, detail="Email is required.")
+    try:
+        invite_user(email)
+    except SupabaseAdminError as e:
+        print(f"[supabase] invite_user failed: {e}", file=sys.stderr)
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"ok": True}
 
 
 @app.patch("/api/admin/users/{user_id}")

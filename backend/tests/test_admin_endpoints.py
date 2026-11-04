@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 import main
 from auth import get_current_user, require_admin, CurrentUser
 from integrations.growifyos_client import GrowifyOSError
+from supabase_admin import SupabaseAdminError
 
 client = TestClient(main.app)
 
@@ -46,6 +47,7 @@ def test_non_admin_rejected_by_real_require_admin_logic():
     ("get",    "/api/admin/teams"),
     ("post",   "/api/admin/teams"),
     ("get",    "/api/admin/users"),
+    ("post",   "/api/admin/users"),
     ("patch",  "/api/admin/users/u1"),
     ("get",    "/api/admin/brand-names"),
     ("post",   "/api/admin/brand-names"),
@@ -125,6 +127,25 @@ def test_update_user_not_found_returns_422():
     with patch.object(main.teams_admin, "update_user", side_effect=ValueError("No such user.")):
         resp = client.patch("/api/admin/users/nonexistent", json={"role": "admin"})
     assert resp.status_code == 422
+
+
+def test_invite_user_requires_email():
+    resp = client.post("/api/admin/users", json={})
+    assert resp.status_code == 422
+
+
+def test_invite_user_success():
+    with patch.object(main, "invite_user", return_value={"id": "u2"}) as mock_invite:
+        resp = client.post("/api/admin/users", json={"email": "new@example.com"})
+    assert resp.status_code == 200
+    mock_invite.assert_called_once_with("new@example.com")
+
+
+def test_invite_user_already_registered_surfaces_the_reason_to_the_admin():
+    with patch.object(main, "invite_user", side_effect=SupabaseAdminError("Could not invite user (HTTP 422) — User already registered.")):
+        resp = client.post("/api/admin/users", json={"email": "existing@example.com"})
+    assert resp.status_code == 502
+    assert "already registered" in resp.text.lower()
 
 
 # ── Brand names (pending, by name) ──────────────────────────────────────

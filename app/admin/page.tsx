@@ -13,7 +13,7 @@ import { Plus, Trash2, Loader2, CheckCircle2, Clock } from 'lucide-react';
 import {
   fetchCurrentUser,
   fetchAdminTeams, createAdminTeam,
-  fetchAdminUsers, updateAdminUser,
+  fetchAdminUsers, updateAdminUser, inviteAdminUser,
   fetchAdminBrandNames, createAdminBrandName, deleteAdminBrandName,
   fetchAdminBrandAssignments, setAdminBrandAssignment,
   type AdminTeam, type AdminUser, type AdminBrandName, type AdminBrandAssignment,
@@ -177,6 +177,11 @@ function UsersTab() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+
   const load = useCallback(() => {
     setLoading(true);
     Promise.all([fetchAdminUsers(), fetchAdminTeams()])
@@ -186,6 +191,24 @@ function UsersTab() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleInvite = async () => {
+    const email = inviteEmail.trim();
+    if (!email) return;
+    setInviting(true);
+    setInviteError(null);
+    setInviteSuccess(null);
+    try {
+      await inviteAdminUser(email);
+      setInviteSuccess(`Invited ${email} — they'll get an email to set their password.`);
+      setInviteEmail('');
+      load();
+    } catch (e: any) {
+      setInviteError(e?.message ?? 'Failed to invite user.');
+    } finally {
+      setInviting(false);
+    }
+  };
 
   const handleRoleChange = async (user: AdminUser, role: string) => {
     setSavingId(user.id);
@@ -214,7 +237,30 @@ function UsersTab() {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-[#EEECE5] overflow-hidden">
+    <div className="space-y-3">
+      <div className="bg-white rounded-xl border border-[#EEECE5] p-5">
+        <label className="text-xs font-medium text-[#57544E] mb-1.5 block">Invite a new user</label>
+        <div className="flex items-end gap-2 max-w-md">
+          <input
+            className={inputClass}
+            type="email"
+            value={inviteEmail}
+            onChange={e => setInviteEmail(e.target.value)}
+            placeholder="teammate@company.com"
+            onKeyDown={e => { if (e.key === 'Enter') handleInvite(); }}
+          />
+          <Button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()} className="bg-[#4F46E5] hover:bg-[#4338CA] h-9 flex-shrink-0">
+            {inviting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Invite'}
+          </Button>
+        </div>
+        <p className="text-xs text-[#8B8780] mt-2">
+          They'll get an email with a link to set their own password, then appear below — assign their role and team here.
+        </p>
+        {inviteError && <p className="text-xs text-red-600 mt-2">{inviteError}</p>}
+        {inviteSuccess && <p className="text-xs text-[#047857] mt-2">{inviteSuccess}</p>}
+      </div>
+
+      <div className="bg-white rounded-xl border border-[#EEECE5] overflow-hidden">
       {error && <p className="text-xs text-red-600 px-5 pt-4">{error}</p>}
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-[#57544E] p-5"><Spinner className="w-4 h-4" /> Loading users…</div>
@@ -257,6 +303,7 @@ function UsersTab() {
           </tbody>
         </table>
       )}
+      </div>
     </div>
   );
 }
