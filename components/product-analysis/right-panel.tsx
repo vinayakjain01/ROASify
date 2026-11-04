@@ -8,7 +8,7 @@ export function ProductAnalysisPanel() {
   const {
     metaFile, shopifyFile, googleFile,
     mergedData, aggregatedProducts, allMonths, selectedMonths,
-    dataSource, syncStatus, googleOverall,
+    dataSource, syncStatus, googleOverall, metaOverall,
   } = useApp();
 
   // Always use aggregatedProducts — it's already month-filtered and per-product
@@ -103,6 +103,21 @@ export function ProductAnalysisPanel() {
               value={roi(googleOverall.totalSpend > 0 ? googleOverall.totalConversionValue / googleOverall.totalSpend : 0)}
             />
             <PanelRow label="Product-level share" value={`${googleOverall.productLevelSharePct.toFixed(1)}%`} />
+          </div>
+        </PanelSection>
+      )}
+
+      {/* Account-wide Meta figures — non-catalog campaigns included, unlike
+          "Avg Meta Spend" above which is only the catalog/product slice. */}
+      {isLive && metaOverall && (
+        <PanelSection title="Meta Ads — account total">
+          <div className="space-y-1">
+            <PanelRow label="Overall Meta Spend" value={inr(metaOverall.totalSpend)} />
+            <PanelRow
+              label="Overall Meta ROAS"
+              value={roi(metaOverall.totalSpend > 0 ? metaOverall.totalConversionValue / metaOverall.totalSpend : 0)}
+            />
+            <PanelRow label="Product-level share" value={`${metaOverall.productLevelSharePct.toFixed(1)}%`} />
           </div>
         </PanelSection>
       )}

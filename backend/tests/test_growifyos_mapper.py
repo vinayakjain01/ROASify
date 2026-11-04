@@ -11,6 +11,7 @@ from integrations.growifyos_mapper import (
     map_shopify_variants,
     map_google_products,
     summarize_google_totals,
+    summarize_meta_totals,
 )
 
 
@@ -309,3 +310,29 @@ def test_summarize_google_totals_missing_optional_fields_coerce_to_zero():
     assert summary["totalConversionValue"] == 0
     assert summary["productLevelSpend"] == 0
     assert summary["byCampaignType"] == {}
+
+
+# ── summarize_meta_totals ─────────────────────────────────────────────────
+# Shares its implementation with summarize_google_totals (same /meta-totals
+# response shape per the API) — just enough coverage here to confirm it's
+# wired up, the shared math itself is already covered above.
+
+def test_summarize_meta_totals_empty_rows_returns_all_zeros():
+    summary = summarize_meta_totals({"rows": []})
+    assert summary["totalSpend"] == 0
+    assert summary["totalConversionValue"] == 0
+    assert summary["productLevelSharePct"] == 0
+
+
+def test_summarize_meta_totals_single_month():
+    payload = {"rows": [{
+        "amountSpent": 54230.11,
+        "conversionValue": 310842.90,
+        "productLevelSpend": 9712.40,
+        "byCampaignType": {"CATALOG_SALES": 9712.40, "ENGAGEMENT": 44517.71},
+    }]}
+    summary = summarize_meta_totals(payload)
+    assert summary["totalSpend"] == 54230.11
+    assert summary["totalConversionValue"] == 310842.90
+    assert summary["productLevelSharePct"] == round(9712.40 / 54230.11 * 100, 2)
+    assert summary["byCampaignType"] == {"CATALOG_SALES": 9712.40, "ENGAGEMENT": 44517.71}

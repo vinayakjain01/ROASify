@@ -59,11 +59,13 @@ def _google_row(product_id, title, cost):
 
 @pytest.fixture(autouse=True)
 def no_google_by_default():
-    """Every /api/analyse-live test gets a default empty Google response so
-    none of them depend on real env vars or make a live network call. Tests
-    that care about Google override this with their own patch.object call."""
+    """Every /api/analyse-live test gets a default empty Google/Meta-totals
+    response so none of them depend on real env vars or make a live network
+    call. Tests that care about one override it with their own patch.object
+    call."""
     with patch.object(main, "get_google_products", return_value=[]), \
-         patch.object(main, "get_google_totals", return_value={"rows": []}):
+         patch.object(main, "get_google_totals", return_value={"rows": []}), \
+         patch.object(main, "get_meta_totals", return_value={"rows": []}):
         yield
 
 
@@ -126,7 +128,7 @@ def test_analyse_live_success_shape_matches_analyse_contract():
     assert set(body.keys()) == {
         "ok", "hasMonth", "hasGoogle", "products", "kpis", "quadrants",
         "discountData", "warnings", "summary", "metaSpendNote", "currency",
-        "googleTotals", "googleSpendNote",
+        "googleTotals", "googleSpendNote", "metaTotals",
     }
     assert body["ok"] is True
     assert body["hasGoogle"] is False
@@ -135,9 +137,11 @@ def test_analyse_live_success_shape_matches_analyse_contract():
     assert body["kpis"]["totalRevenue"] == 5000
     assert "catalog/product ads only" in body["metaSpendNote"]
     assert body["currency"] == "INR"  # default when not specified
-    # No google-totals data was returned (default fixture), so these stay null.
+    # No google-totals/meta-totals data was returned (default fixture), so
+    # these stay null.
     assert body["googleTotals"] is None
     assert body["googleSpendNote"] is None
+    assert body["metaTotals"] is None
 
 
 def test_analyse_live_defaults_to_inr_and_passes_currency_through_to_fetchers():
@@ -389,6 +393,53 @@ def test_analyse_live_google_totals_currency_matches_sync_currency():
         })
 
     mock_totals.assert_called_once_with("b1", "2026-10-01", "2026-10-31", "USD")
+
+
+# ── /api/analyse-live — Meta account-level totals (best-effort) ───────────
+
+_META_TOTALS_PAYLOAD = {"rows": [{
+    "amountSpent": 54230.11, "conversionValue": 310842.90,
+    "productLevelSpend": 9712.40,
+    "byCampaignType": {"CATALOG_SALES": 9712.40, "ENGAGEMENT": 44517.71},
+}]}
+
+
+def test_analyse_live_includes_meta_totals_when_available():
+    meta_rows    = [_meta_row("1001", "Dress", 1000)]
+    shopify_rows = [_shopify_row("1001", "Dress", "S", 5000)]
+
+    with patch.object(main, "get_meta_products", return_value=meta_rows), \
+         patch.object(main, "get_shopify_variants", return_value=shopify_rows), \
+         patch.object(main, "get_meta_totals", return_value=_META_TOTALS_PAYLOAD) as mock_totals:
+        resp = client.post("/api/analyse-live", data={
+            "brandId": "b1", "from": "2026-10-01", "to": "2026-10-31",
+        })
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["metaTotals"]["totalSpend"] == 54230.11
+    assert body["metaTotals"]["productLevelSharePct"] == round(9712.40 / 54230.11 * 100, 2)
+    assert body["kpis"]["totalMetaSpendOverall"] == 54230.11
+    assert body["kpis"]["metaProductLevelSharePct"] == round(9712.40 / 54230.11 * 100, 2)
+    mock_totals.assert_called_once_with("b1", "2026-10-01", "2026-10-31", "INR")
+
+
+def test_analyse_live_meta_totals_failure_does_not_block_the_sync():
+    meta_rows    = [_meta_row("1001", "Dress", 1000)]
+    shopify_rows = [_shopify_row("1001", "Dress", "S", 5000)]
+
+    with patch.object(main, "get_meta_products", return_value=meta_rows), \
+         patch.object(main, "get_shopify_variants", return_value=shopify_rows), \
+         patch.object(main, "get_meta_totals", side_effect=GrowifyOSError("meta-totals down")):
+        resp = client.post("/api/analyse-live", data={
+            "brandId": "b1", "from": "2026-04-01", "to": "2026-04-30",
+        })
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["metaTotals"] is None
+    assert "totalMetaSpendOverall" not in body["kpis"]
+    assert "meta-totals down" not in resp.text
 
 
 # ── Team-based brand access (authorization) ─────────────────────────────────

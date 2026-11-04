@@ -136,3 +136,12 @@ def get_google_totals(brand_id: str, date_from: str, date_to: str, currency: str
     if umbrella:
         params["umbrella"] = "true"
     return _get("/google-totals", params)
+
+
+def get_meta_totals(brand_id: str, date_from: str, date_to: str, currency: str = "INR", umbrella: bool = False) -> dict:
+    # Same account-level, not-paginated shape as get_google_totals() above —
+    # one row per month, same field names (per the API).
+    params = {"brandId": brand_id, "from": date_from, "to": date_to, "currency": currency}
+    if umbrella:
+        params["umbrella"] = "true"
+    return _get("/meta-totals", params)

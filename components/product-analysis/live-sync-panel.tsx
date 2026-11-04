@@ -37,6 +37,7 @@ export function LiveSyncPanel() {
     setMergedResult, setMetaSpendNote,
     setCurrency, setSyncedCurrency,
     setGoogleOverall,
+    setMetaOverall,
   } = useApp();
 
   const [brands, setBrands]             = useState<Brand[]>([]);
@@ -150,6 +151,18 @@ export function LiveSyncPanel() {
           : null
       );
 
+      // Account-wide Meta figures (non-catalog campaigns included) — same
+      // best-effort posture as googleOverall above.
+      setMetaOverall(
+        result.metaTotals
+          ? {
+              totalSpend: Number(result.metaTotals.totalSpend ?? 0),
+              totalConversionValue: Number(result.metaTotals.totalConversionValue ?? 0),
+              productLevelSharePct: Number(result.metaTotals.productLevelSharePct ?? 0),
+            }
+          : null
+      );
+
       // Lock the top bar's display symbol to the currency we actually just
       // fetched in — the API performed a real conversion, so an independent
       // cosmetic symbol choice would now be actively misleading.
@@ -163,7 +176,7 @@ export function LiveSyncPanel() {
     } finally {
       setSyncing(false);
     }
-  }, [selectedBrand, dateRange, discountFile, syncCurrency, setMergedResult, setMetaSpendNote, setCurrency, setSyncedCurrency, setGoogleOverall]);
+  }, [selectedBrand, dateRange, discountFile, syncCurrency, setMergedResult, setMetaSpendNote, setCurrency, setSyncedCurrency, setGoogleOverall, setMetaOverall]);
 
   const metaStatus    = syncStatus?.meta;
   const shopifyStatus = syncStatus?.shopify;

@@ -119,12 +119,10 @@ def map_google_products(rows: list) -> pd.DataFrame:
     return out[GOOGLE_COLUMNS].reset_index(drop=True)
 
 
-def summarize_google_totals(payload: dict) -> dict:
-    """Collapses /google-totals' one-row-per-month response into a single
-    account-level summary for the requested range. Not fed into analytics.py —
-    this is a separate, account-wide figure (total Google spend including
-    non-product campaigns), not a per-product row, so it never merges with
-    Meta/Shopify data the way map_google_products() does."""
+def _summarize_ads_totals(payload: dict) -> dict:
+    """Shared by summarize_google_totals()/summarize_meta_totals() — both
+    /google-totals and /meta-totals return the same one-row-per-month shape,
+    just backed by a different ad platform."""
     rows = payload.get("rows") or []
 
     total_spend = 0.0
@@ -151,3 +149,19 @@ def summarize_google_totals(payload: dict) -> dict:
         "productLevelSharePct": round(product_level_share_pct, 2),
         "byCampaignType": {k: round(v, 2) for k, v in by_campaign_type.items()},
     }
+
+
+def summarize_google_totals(payload: dict) -> dict:
+    """Collapses /google-totals' one-row-per-month response into a single
+    account-level summary for the requested range. Not fed into analytics.py —
+    this is a separate, account-wide figure (total Google spend including
+    non-product campaigns), not a per-product row, so it never merges with
+    Meta/Shopify data the way map_google_products() does."""
+    return _summarize_ads_totals(payload)
+
+
+def summarize_meta_totals(payload: dict) -> dict:
+    """Same as summarize_google_totals(), for /meta-totals — a separate,
+    account-wide figure (total Meta spend including non-catalog campaigns),
+    never merged with the per-product data from map_meta_products()."""
+    return _summarize_ads_totals(payload)

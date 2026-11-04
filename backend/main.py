@@ -16,12 +16,14 @@ from integrations.growifyos_client import (
     get_shopify_variants,
     get_google_products,
     get_google_totals,
+    get_meta_totals,
 )
 from integrations.growifyos_mapper import (
     map_meta_products,
     map_shopify_variants,
     map_google_products,
     summarize_google_totals,
+    summarize_meta_totals,
 )
 
 GOOGLE_SPEND_NOTE = (
@@ -289,6 +291,18 @@ async def analyse_live(
         print(f"[growifyos] /api/analyse-live google-totals failed: {e}", file=sys.stderr)
         google_totals_summary = None
 
+    # ── Meta account-level totals (optional, best-effort) — same posture as
+    #    google_totals_summary above, for total Meta spend INCLUDING
+    #    non-catalog campaigns, never merged into merged_df/analytics. ───────
+    meta_totals_summary = None
+    try:
+        meta_totals_payload = get_meta_totals(brandId, from_, to, currency)
+        if meta_totals_payload.get("rows"):
+            meta_totals_summary = summarize_meta_totals(meta_totals_payload)
+    except Exception as e:
+        print(f"[growifyos] /api/analyse-live meta-totals failed: {e}", file=sys.stderr)
+        meta_totals_summary = None
+
     # ── Discount list (optional) — parsed inline here rather than shared
     #    with /api/analyse, so that endpoint's code path is never touched ──
     discount_df    = None
@@ -356,6 +370,9 @@ async def analyse_live(
     if google_totals_summary:
         kpis["totalGoogleSpendOverall"]    = google_totals_summary["totalSpend"]
         kpis["googleProductLevelSharePct"] = google_totals_summary["productLevelSharePct"]
+    if meta_totals_summary:
+        kpis["totalMetaSpendOverall"]    = meta_totals_summary["totalSpend"]
+        kpis["metaProductLevelSharePct"] = meta_totals_summary["productLevelSharePct"]
 
     return {
         "ok":           True,
@@ -378,6 +395,10 @@ async def analyse_live(
         # /google-totals fetch failed, same best-effort posture as google_df.
         "googleTotals":    google_totals_summary,
         "googleSpendNote": GOOGLE_SPEND_NOTE if google_totals_summary else None,
+        # Account-wide Meta figures (non-catalog campaigns included) — same
+        # best-effort posture as googleTotals above. null when /meta-totals
+        # wasn't available.
+        "metaTotals":      meta_totals_summary,
         "summary": {
             "products":    product_result["all"].to_dict(orient="records") if not product_result["all"].empty else [],
             "total_spend": kpis["totalSpend"],

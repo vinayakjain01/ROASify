@@ -201,6 +201,11 @@ interface AppState {
   // fetch wasn't available (best-effort, same posture as Google per-product data).
   googleOverall: GoogleOverall | null;
   setGoogleOverall: (g: GoogleOverall | null) => void;
+
+  // Same as googleOverall, from /meta-totals — account-wide Meta spend
+  // (non-catalog campaigns included), separate from "Meta Spend" above.
+  metaOverall: MetaOverall | null;
+  setMetaOverall: (m: MetaOverall | null) => void;
 }
 
 export interface GoogleOverall {
@@ -208,6 +213,12 @@ export interface GoogleOverall {
   totalConversionValue: number;
   productLevelSharePct: number;
   note: string;
+}
+
+export interface MetaOverall {
+  totalSpend: number;
+  totalConversionValue: number;
+  productLevelSharePct: number;
 }
 
 const CURRENCY_STORAGE_KEY = "roasify_currency";
@@ -261,6 +272,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [metaSpendNote, setMetaSpendNote] = useState<string | null>(null);
   const [syncedCurrency, setSyncedCurrency] = useState<CurrencyCode | null>(null);
   const [googleOverall, setGoogleOverall] = useState<GoogleOverall | null>(null);
+  const [metaOverall, setMetaOverall] = useState<MetaOverall | null>(null);
 
   const setSelectedBrand = useCallback((id: string | null) => {
     setSelectedBrandRaw(id);
@@ -401,6 +413,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       metaSpendNote, setMetaSpendNote,
       syncedCurrency, setSyncedCurrency,
       googleOverall, setGoogleOverall,
+      metaOverall, setMetaOverall,
     }}>
       {children}
     </AppContext.Provider>
