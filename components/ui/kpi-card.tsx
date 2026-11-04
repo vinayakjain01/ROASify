@@ -10,6 +10,12 @@ interface KpiCardProps {
   format?: 'currency' | 'number' | 'roi' | 'percentage' | 'raw';
   showSparkline?: boolean;
   className?: string;
+  // true (default): value text scales with the card's own width and the
+  // value's length (Product Analysis's 6-card strip, which gets genuinely
+  // cramped when the right panel is open). false: a fixed size regardless
+  // of panel state — for strips like Quadrant View's 4 cards, which never
+  // need the room and should always look the same.
+  fluid?: boolean;
 }
 
 // Simple decorative sparkline - no actual data, just visual
@@ -34,13 +40,14 @@ function Sparkline({ trend = 'up' }: { trend?: 'up' | 'down' | 'flat' }) {
   );
 }
 
-export function KpiCard({ 
-  label, 
-  value, 
-  delta, 
+export function KpiCard({
+  label,
+  value,
+  delta,
   format = 'raw',
   showSparkline = true,
-  className 
+  className,
+  fluid = true,
 }: KpiCardProps) {
   const formattedValue = (() => {
     if (typeof value === 'string') return value;
@@ -84,10 +91,12 @@ export function KpiCard({
           <div
             className={cn(
               "font-semibold text-[#1A1814] tabular-nums leading-tight",
-              "text-[clamp(12px,calc((100cqw_-_32px)/var(--kpi-w)),20px)]",
+              fluid
+                ? "text-[clamp(12px,calc((100cqw_-_32px)/var(--kpi-w)),20px)]"
+                : "text-[20px]",
               "truncate whitespace-nowrap overflow-hidden"
             )}
-            style={{ ['--kpi-w' as any]: kpiCharWeight }}
+            style={fluid ? { ['--kpi-w' as any]: kpiCharWeight } : undefined}
           >
             {formattedValue}
           </div>
@@ -113,9 +122,10 @@ export function KpiCard({
 interface KpiStripProps {
   cards: KpiCardProps[];
   className?: string;
+  fluid?: boolean;
 }
 
-export function KpiStrip({ cards, className }: KpiStripProps) {
+export function KpiStrip({ cards, className, fluid = true }: KpiStripProps) {
   return (
     <div
       className={cn(
@@ -125,7 +135,7 @@ export function KpiStrip({ cards, className }: KpiStripProps) {
       )}
     >
       {cards.map((card, index) => (
-        <KpiCard key={index} {...card} />
+        <KpiCard key={index} fluid={fluid} {...card} />
       ))}
     </div>
   );
